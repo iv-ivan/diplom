@@ -3,7 +3,7 @@
 
 from numpy import *
 #from sklearn.cluster import KMeans
-from yael import ynumpy
+#from yael import ynumpy
 
 import config
 from common import normalize_cols
@@ -31,7 +31,7 @@ def reduce_tsne(D, to_dim=2):
     return array([x for x in bh_tsne(D, verbose=True)])
 
 
-def reduce_cluster(D, num_clusters, params=config.default_config()):
+'''def reduce_cluster(D, num_clusters, params=config.default_config()):
     print('Clustering:')
     D = ascontiguousarray(D.astype('float32'))
     centroids, qerr, dis, labels, nassign = ynumpy.kmeans(D, num_clusters, init='kmeans++', nt=params['num_threads'], output='all', redo=3, niter=params['kmeans_max_iter'], verbose=False)
@@ -60,7 +60,7 @@ def reduce_multi_cluster(D, num_clusters, params=config.default_config()):
         labels[:, it] = new_labels.squeeze() + c
         c += nc
     print('Done.')
-    return centroids, labels
+    return centroids, labels'''
 
 
 def anchor_words(D, loss='L2', params=config.default_config()):

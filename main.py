@@ -90,7 +90,7 @@ def gen_init(cfg=config.default_config()):
     return (Phi, Theta)
 
 
-def run(F, Phi, Theta, Phi_r=None, Theta_r=None, cfg=config.default_config()):#run(V, W, H, W_r=None, H_r=None, cfg=config.default_config()):
+def run(F, Phi, Theta, Phi_r=None, Theta_r=None, cfg=config.default_config()):
     """Em-algo method.
        - Return:
        val
@@ -186,8 +186,8 @@ def load_dataset(cfg=config.default_config()):
     if cfg['load_data'] == 'uci' or cfg['load_data'] == 1:
         print("uci")
         F, vocab = data.load_uci(cfg['data_name'], cfg)
-        #F = normalize_cols(F)
         N, M = F.shape
+        F = normalize_cols(F)
         cfg['N'], cfg['M'] = F.shape
         print('Dimensions of F:', N, M)
         print('Checking assumption on F:', np.sum(F, axis=0).max())

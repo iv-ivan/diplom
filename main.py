@@ -181,7 +181,7 @@ def load_dataset(cfg=config.default_config()):
     if cfg['load_data'] == 'uci' or cfg['load_data'] == 1:
         print("uci")
         F, vocab = data.load_uci(cfg['data_name'], cfg)
-        #V = normalize_cols(V) TODO:see arora for normalization
+        #F = normalize_cols(F)
         N, M = F.shape
         cfg['N'], cfg['M'] = F.shape
         print('Dimensions of F:', N, M)
@@ -227,6 +227,8 @@ def main(config_file='config.txt', results_file='results.txt', cfg=None):
        measure
        compare_methods
        schedule
+       compare_real
+       save_topics
     """
     if cfg == None:
         cfg = config.load(config_file)
@@ -314,17 +316,19 @@ def main(config_file='config.txt', results_file='results.txt', cfg=None):
                 print(name, ':', val)
 
             #save results for different runs
-            visualize.save_topics(Phi, os.path.join(cfg['result_dir'], cfg['experiment'] + '_'+str(current_exp)+'topics.txt'), vocab)
+            if cfg['save_topics']:
+                visualize.save_topics(Phi, os.path.join(cfg['result_dir'], cfg['experiment'] + '_'+str(current_exp)+'topics.txt'), vocab)
             if cfg['compare_real']:
                 visualize.show_matrices_recovered(Phi_r, Theta_r, Phi, Theta, cfg, permute=True)
             current_exp += 1
 
-    #save results
-    print(cfg['experiment'])
+    #save result
     if cfg['experiment'] == '':
         exp_name = 'test'
     else:
         exp_name = cfg['experiment']
+
+    #TODO:check
     if cfg['show_results']:
         if not os.path.exists(cfg['result_dir']):
             os.makedirs(cfg['result_dir'])

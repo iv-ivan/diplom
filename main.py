@@ -213,6 +213,13 @@ def initialize_matrices(i, F, cfg=config.default_config()):
         print("Random")
         return gen_init(cfg)
 
+def calculate_stats(series):
+    series_mean = np.mean(series, axis=0)
+    series_var = np.var(series, axis=0)
+    series_min = series[np.argmin(series[:,-1]),:]
+    series_max = series[np.argmax(series[:,-1]),:]
+    return series_mean, np.sqrt(series_var), series_min, series_max
+
 def main(config_file='config.txt', results_file='results.txt', cfg=None):
     """Main function which runs experiments.
        - Return:
@@ -322,7 +329,7 @@ def main(config_file='config.txt', results_file='results.txt', cfg=None):
                 visualize.show_matrices_recovered(Phi_r, Theta_r, Phi, Theta, cfg, permute=True)
             current_exp += 1
 
-    #save result
+    #save results section
     if cfg['experiment'] == '':
         exp_name = 'test'
     else:
@@ -354,7 +361,6 @@ if __name__ == '__main__':
     print("Loading config...")
     cfg = config.load()
     print("Config is loaded")
-
     if not os.path.exists(cfg['result_dir']):
         os.makedirs(cfg['result_dir'])
 
@@ -370,11 +376,18 @@ if __name__ == '__main__':
         fun = getattr(measure, fun_name + '_name')
         plt.ylabel(fun(), fontsize=13)
 
-        for j in xrange(val.shape[0]):
-            plt.plot(val[j, 1:], linewidth=2, c=colors[0], marker='o', linestyle='--')
+        index_exp_series = 0
+        for it, expirement_runs in enumerate([int(x) for x in cfg['runs'].split(",")]):
+            series_stats = calculate_stats(val[index_exp_series:index_exp_series+expirement_runs, 1:])
+            plt.plot(series_stats[0], linewidth=2, c=colors[it % len(colors)], label = str(it+1))
+            plt.fill_between(range(len(series_stats[0])), series_stats[0] + series_stats[1], series_stats[0] - series_stats[1], alpha = 0.1, facecolor=colors[it % len(colors)])
+            plt.plot(series_stats[2], linewidth=0.5, c=colors[it % len(colors)])
+            plt.plot(series_stats[3], linewidth=0.5, c=colors[it % len(colors)])
+            index_exp_series += expirement_runs
 
-        #plt.legend(['arora-PLSA']+['random-PLSA' for i in xrange(val.shape[0]-1)])#['ALS', 'HALS', 'MU', 'PLSA'])
+        plt.legend()
         plt.draw()
+
         filename = os.path.join(cfg['result_dir'], cfg['experiment']+'_'+fun_name+'.pdf')
         plt.savefig(filename, format='pdf')
     plt.show()

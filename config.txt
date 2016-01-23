@@ -18,7 +18,7 @@ new_dim = 1000
 # data params
 
 data_dir = datasets
-load_data = 0 #uci # 0, no - do not load; 1, csv - csv format; 2, uci - uci format
+load_data = 1 #uci # 0, no - do not load; 1, csv - csv format; §, uci - uci format
 data_name = nips
 gen_name = 0_1_100_16_500
 
@@ -67,7 +67,7 @@ T_begin = 5
 T_end = 100
 T_step = 5
 run_info = 1 # none(0), results(1), run(2)
-runs = 1, 20 # times to run the experiments
+runs = 1, 25 # times to run the experiments
 schedule = plsa #als,hals,mult,plsa # schedule of methods (no spaces); all methods in methods.py
 measure = frobenius,rmse,perplexity # measures to produce; all methods in measure.py
 finals = mean_pmi,mean_max_pmi,mean_hell,mean_nhell,min_nhell

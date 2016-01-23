@@ -8,9 +8,10 @@ import generators
 import methods
 import measure
 from common import cost, normalize_cols, hellinger, print_head, get_permute
-from visualize import *
-from data import *
-from prepare import *
+import visualize
+import data
+import prepare
+#from numpy import linalg
 
 import os
 import numpy as np
@@ -22,44 +23,80 @@ from copy import deepcopy
 
 
 def gen_real(cfg=config.default_config()):
+    """Generate matrices with real values for model experiment.
+       - Return:
+       F
+       Phi_r
+       Theta_r
+       - Used params:
+       N
+       T_0
+       M
+       gen_phi
+       phi_sparsity
+       gen_theta
+       theta_sparsity
+    """
     N = cfg['N']
-    T = cfg['T_0']
+    T_0 = cfg['T_0']
     M = cfg['M']
+
     gen_phi = getattr(generators, cfg['gen_phi'])
     cfg['rows'] = N
-    cfg['cols'] = T
+    cfg['cols'] = T_0
     cfg['sparsity'] = cfg['phi_sparsity']
-    W_r = gen_phi(cfg)
+    Phi_r = gen_phi(cfg)
+
     gen_theta = getattr(generators, cfg['gen_theta'])
-    cfg['rows'] = T
+    cfg['rows'] = T_0
     cfg['cols'] = M
     cfg['sparsity'] = cfg['theta_sparsity']
-    H_r = gen_theta(cfg)
-    #W_r = gen_matrix_sparse(N, T, 0.2)
-    #W_r = gen_matrix_topic(cfg)
-    #H_r = gen_matrix_sparse(T, M, 0.3)
-    V = np.dot(W_r, H_r)
-    return (V, W_r, H_r)
+    Theta_r = gen_theta(cfg)
+
+    F = np.dot(Phi_r, Theta_r)
+    return (F, Phi_r, Theta_r)
 
 
 def gen_init(cfg=config.default_config()):
+    """Generate real valued initialization matrices.
+       - Return:
+       Phi
+       Theta
+       - Used params:
+       N
+       T
+       M
+       gen_phi
+       phi_sparsity
+       gen_theta
+       theta_sparsity
+    """
     N = cfg['N']
     T = cfg['T']
     M = cfg['M']
+
     gen_phi = getattr(generators, cfg['phi_init'])
     cfg['rows'] = N
     cfg['cols'] = T
     cfg['sparsity'] = cfg['phi_sparsity']
-    W = gen_phi(cfg)
+    Phi = gen_phi(cfg)
+
     gen_theta = getattr(generators, cfg['theta_init'])
     cfg['rows'] = T
     cfg['cols'] = M
     cfg['sparsity'] = cfg['theta_sparsity']
-    H = gen_theta(cfg)
-    return (W, H)
+    Theta = gen_theta(cfg)
+
+    return (Phi, Theta)
 
 
 def run(V, W, H, W_r=None, H_r=None, cfg=config.default_config()):
+    """Em-algo method.
+       - Return:
+
+       - Used params:
+
+    """
     T = H.shape[0]
     eps = cfg['eps']
     schedule = cfg['schedule'].split(',')
@@ -128,8 +165,69 @@ def run(V, W, H, W_r=None, H_r=None, cfg=config.default_config()):
         hdist[it+2:] = hellinger(W[:, idx[:, 1]], W_r[:, idx[:, 0]]) / T
     return (val, hdist, it, W, H, status)
 
+def load_dataset(cfg=config.default_config()):
+    """Load or generate dataset.
+       - Return:
+       F
+       vocab
+       N
+       M
+       Phi_r
+       Theta_r 
+       - Used params:
+       load_data
+       data_name?
+    """
+    if cfg['load_data'] == 'uci' or cfg['load_data'] == 1:
+        print("uci")
+        F, vocab = data.load_uci(cfg['data_name'], cfg)
+        #V = normalize_cols(V) TODO:see arora for normalization
+        N, M = F.shape
+        cfg['N'], cfg['M'] = F.shape
+        print('Dimensions of F:', N, M)
+        print('Checking assumption on F:', np.sum(F, axis=0).max())
+        return F, vocab, N, M, None, None
+    else:
+        F, Phi_r, Theta_r = gen_real(cfg)
+        print('Checking assumption on F:', np.sum(F, axis=0).max())
+        return F, None, F.shape[0], F.shape[1], Phi_r, Theta_r
+
+def initialize_matrices(i, F, cfg=config.default_config()):
+    """Initialize matrices Phi Theta.
+       - Return:
+       Phi
+       Theta
+       - Used params:
+       prepare_method
+    """
+    if (int(cfg['prepare_method'].split(',')[i]) == 1):
+        print("Arora")
+        eps = cfg['eps']
+        Phi = prepare.anchor_words(F, 'L2', cfg)
+        print('Solving for Theta')
+        Theta = np.linalg.solve(np.dot(Phi.T, Phi) + np.eye(Phi.shape[1]) * eps, np.dot(Phi.T, F))
+        Theta[Theta < eps] = 0
+        Theta = normalize_cols(Theta)
+        return Phi, Theta
+    elif (int(cfg['prepare_method'].split(',')[i]) == 2):
+        print("Random")
+        return gen_init(cfg)
 
 def main(config_file='config.txt', results_file='results.txt', cfg=None):
+    """Main function which runs experiments.
+       - Return:
+       res
+       - Used params:
+       N
+       T
+       M
+       eps
+       seed?
+       run_info
+       measure
+       compare_methods
+       schedule
+    """
     if cfg == None:
         cfg = config.load(config_file)
     if cfg['seed'] >= 0:
@@ -142,8 +240,9 @@ def main(config_file='config.txt', results_file='results.txt', cfg=None):
     T = cfg['T']
     M = cfg['M']
     vocab = None
-    W_r = None
-    H_r = None
+    Phi_r = None
+    Theta_r = None
+
     if cfg['run_info'] == 'results' or cfg['run_info'] == 1:
         cfg['print_lvl'] = 1
     elif cfg['run_info'] == 'run' or cfg['run_info'] == 2:
@@ -151,36 +250,22 @@ def main(config_file='config.txt', results_file='results.txt', cfg=None):
     else:
         cfg['print_lvl'] = 0
     if cfg['print_lvl'] > 0:
-        print('Generating...')
+        print('Generating matrices...')
 
-    #load dataset
-    if cfg['load_data'] == 'uci' or cfg['load_data'] == 2:
-        print("uci")
-        V, vocab = load_uci(cfg['data_name'], cfg)
-        V = normalize_cols(V)
-        N, M = V.shape
-        cfg['N'], cfg['M'] = V.shape
-        print('Size:', N, M)
-    elif cfg['load_data'] == 'csv' or cfg['load_data'] == 1:
-        _, W_r, H_r = load_csv(cfg['gen_name'], cfg)
-        V, vocab = load_uci(cfg['gen_name'], cfg)
-        V = normalize_cols(V)
-        N, M = V.shape
-        cfg['N'], cfg['M'] = V.shape
-        print('Size:', N, M)
-        cfg['T_0'] = W_r.shape[1]
-    else:
-        V, W_r, H_r = gen_real(cfg)
-    print('Checking assumption on V:', np.sum(V, axis=0).max())
+    #loading dataset or generating new
+    F, vocab, N, M, Phi_r, Theta_r = load_dataset(cfg)
     
-    #run calculation
-    res = [0] * cfg['runs']
-    finals = [0] * cfg['runs']
-    hdist_runs = [0] * cfg['runs']
-    exp_time = [0] * cfg['runs']
+    #loading expirement information
+    total_runs = sum([int(x) for x in cfg['runs'].split(",")])
+    results = [0] * total_runs #res==results, different quality measures arrays
+    finals = [0] * total_runs
+    hdist_runs = [0] * total_runs #hellinger distances arrays
+    exp_time = [0] * total_runs #time for run EM-algo
+
+    #measures to implement
     meas = cfg['measure'].split(',')
     meas_name = [''] * len(meas)
-    print('Measures:')
+    print('Used measures:')
     for i, f_name in enumerate(meas):
         f = getattr(measure, f_name + '_name')
         meas_name[i] = f()
@@ -191,147 +276,50 @@ def main(config_file='config.txt', results_file='results.txt', cfg=None):
         methods = cfg['schedule'].split(',')
         nmethods = len(methods)
 
-    #arora
-    for r in range(cfg['runs']):
-        if cfg['print_lvl'] > 0:
-            print('Run', r+1)
-        if cfg['print_lvl'] > 0:
-            print('  Starting...')
-        
-        labels = None
-        st = time()
-        if r >= cfg['prepare'] and cfg['prepare'] >= 0 and cfg['prepare_method'] > 0:
+    #initialization
+    current_exp = 0
+    for it, expirement_runs in enumerate([int(x) for x in cfg['runs'].split(",")]):
+        for r in range(expirement_runs):
+            if cfg['print_lvl'] > 0:
+                print('Run', r+1,'/',expirement_runs, 'of expirement', it+1)
+                print('  Starting...')
+            labels = None
+            start_time = time()
+            Phi, Theta = None, None
+
             print('Preparing data...')
-            #simple arora
-            if (cfg['prepare_method'].split(','))[r] == '1':
-                print("Arora")
-                W = anchor_words(V, 'L2', cfg)
-                print('Solving for H')
-                H = linalg.solve(np.dot(W.T, W) + np.eye(W.shape[1]) * eps, np.dot(W.T, V))
-                H[H < eps] = 0
-                H = normalize_cols(H)
-            elif (cfg['prepare_method'].split(','))[r] == '2':
-                print("random")
-                (W, H) = gen_init(cfg)
-            '''elif cfg['prepare_method'] == 2:
-                centroids, labels = reduce_cluster(V.T, cfg['T'], cfg)
-                W = centroids.T
-                W[W < eps] = 0
-                W = normalize_cols(W)
-                print('Solving for H')
-                H = linalg.solve(np.dot(W.T, W) + np.eye(W.shape[1]) * eps, np.dot(W.T, V))
-                H[H < eps] = 0
-                H = normalize_cols(H)
-            elif cfg['prepare_method'] == 3:
-                centroids, labels = reduce_cluster(V, cfg['num_clusters'], cfg)
-                W = anchor_words(centroids, 'L2', cfg)
-                print('Solving for H')
-                H = linalg.solve(np.dot(W.T, W) + np.eye(W.shape[1]) * eps, np.dot(W.T, normalize_cols(centroids)))
-                H[H < eps] = 0
-                H = normalize_cols(H)
-                W = restore_cluster(W, labels, cfg)
-            elif cfg['prepare_method'] >= 4 and cfg['prepare_method'] <= 6:
-                if cfg['prepare_method'] == 4:
-                    red = reduce_tsne(V, to_dim=4)
-                elif cfg['prepare_method'] == 5:
-                    red = reduce_tsne(V, to_dim=3)
-                elif cfg['prepare_method'] == 6:
-                    red = reduce_tsne(V, to_dim=2)
-                centroids, labels = reduce_cluster(red, cfg['num_clusters'], cfg)
-                nearest_words = find_nearest(red, centroids, labels)
-                V_reduced = normalize_cols(V[nearest_words, :])
-                W = anchor_words(V_reduced, 'L2', cfg)
-                print('Solving for H')
-                H = linalg.solve(np.dot(W.T, W) + np.eye(W.shape[1]) * eps, np.dot(W.T, V_reduced))
-                H[H < eps] = 0
-                H = normalize_cols(H)
-                W = restore_cluster(W, labels, cfg)
-            elif cfg['prepare_method'] == 10:
-                centroids, labels = reduce_multi_cluster(V, cfg['num_clusters'], cfg)
-                W = anchor_words(centroids, 'L2', cfg)
-                print('Solving for H')
-                H = linalg.solve(np.dot(W.T, W) + np.eye(W.shape[1]) * eps, np.dot(W.T, normalize_cols(centroids)))
-                H[H < eps] = 0
-                H = normalize_cols(H)
-                #W = restore_multi_cluster(W, labels, cfg)
-                W = linalg.solve(dot(H, H.T) + eye(H.shape[0]) * eps, dot(H, V.T)).T
-                W[W < eps] = 0
-                W = normalize_cols(W)'''
-        else:
-            print("error prepare")
-            (W, H) = gen_init(cfg)
+            Phi, Theta = initialize_matrices(it, F, cfg)
+            end_time = time() - start_time
+            print('Preparing took time:', timedelta(seconds=end_time))
 
-        se = time() - st
-        print('Preparing took time:', timedelta(seconds=se))
-        
-        
-        '''if cfg['compare_prepare'] > 0:
-            if r > 0:
-                print('Preparing data...')
-                if r == 1:
-                    W = anchor_words(V, 'L2', cfg)
-                    print('Solving for H')
-                    H = linalg.solve(np.dot(W.T, W) + np.eye(W.shape[1]) * eps, np.dot(W.T, V))
-                    H[H < eps] = 0
-                    H = normalize_cols(H)
-                elif r == 2:
-                    centroids, labels = reduce_cluster(V, cfg['T'], cfg)
-                    H = centroids
-                    H[H < eps] = 0
-                    H = normalize_cols(H)
-                    print('Solving for W')
-                    W = linalg.solve(dot(H, H.T) + eye(H.shape[0]) * eps, dot(H, V.T)).T
-                    W[W < eps] = 0
-                    W = normalize_cols(W)
-                elif r == 3:
-                    centroids, labels = reduce_cluster(V, cfg['num_clusters'], cfg)
-                    W = anchor_words(centroids, 'L2', cfg)
-                    print('Solving for H')
-                    H = linalg.solve(np.dot(W.T, W) + np.eye(W.shape[1]) * eps, np.dot(W.T, normalize_cols(centroids)))
-                    H[H < eps] = 0
-                    H = normalize_cols(H)
-                    W = restore_cluster(W, labels, cfg)
-                elif r >= 4 and r <= 6:
-                    if r == 4:
-                        red = reduce_tsne(V, to_dim=4)
-                    elif r == 5:
-                        red = reduce_tsne(V, to_dim=3)
-                    elif r == 6:
-                        red = reduce_tsne(V, to_dim=2)
-                    centroids, labels = reduce_cluster(red, cfg['num_clusters'], cfg)
-                    nearest_words = find_nearest(red, centroids, labels)
-                    V_reduced = V[nearest_words, :]
-                    W = anchor_words(V_reduced, 'L2', cfg)
-                    print('Solving for H')
-                    H = linalg.solve(np.dot(W.T, W) + np.eye(W.shape[1]) * eps, np.dot(W.T, V_reduced))
-                    H[H < eps] = 0
-                    H = normalize_cols(H)
-                    W = restore_cluster(W, labels, cfg)'''
+            #choose one method for compare (plsa)
+            if cfg['compare_methods'] > 0:
+                cfg['schedule'] = methods[0]
 
-        #choose one method for compare (plsa)
-        if cfg['compare_methods'] > 0:
-            cfg['schedule'] = methods[r % nmethods]
+            #calculate usual EM-alg
+            start = time()
+            (val, hdist, i, Phi, Theta, status) = run(F, Phi, Theta, Phi_r, Theta_r, cfg)
+            stop = time()
+            print('Run time:', timedelta(seconds=stop - start))
 
-        start = time()
-        #W,H - from arora, W_r real W. Calculate usual EM-alg
-        (val, hdist, it, W, H, status) = run(V, W, H , W_r, H_r, cfg)
-        stop = time()
-        print('Run time:', timedelta(seconds=stop - start))
+            #write results
+            exp_time[current_exp] = stop - start
+            results[current_exp] = val
+            hdist_runs[current_exp] = hdist
+            if cfg['print_lvl'] > 0:
+                print('  Result:', val[-1, :])
+            for i, fun_name in enumerate(cfg['finals'].split(',')):
+                fun = getattr(measure, fun_name)
+                name, val = fun(Phi, Theta)
+                print(name, ':', val)
 
-        exp_time[r] = stop - start
-        res[r] = val
-        hdist_runs[r] = hdist
-        if cfg['print_lvl'] > 0:
-            print('  Result:', val[-1, :])
-        for i, fun_name in enumerate(cfg['finals'].split(',')):
-            fun = getattr(measure, fun_name)
-            name, val = fun(W, H)
-            print(name, ':', val)
-        #show results for different runs
-        save_topics(W, join(cfg['result_dir'], cfg['experiment'] + '_'+str(r)+'topics.txt'), vocab)
-        if cfg['compare_real']:
-            show_matrices_recovered(W_r, H_r, W, H, cfg, permute=True)
+            #save results for different runs
+            visualize.save_topics(Phi, os.path.join(cfg['result_dir'], cfg['experiment'] + '_'+str(current_exp)+'topics.txt'), vocab)
+            if cfg['compare_real']:
+                visualize.show_matrices_recovered(Phi_r, Theta_r, Phi, Theta, cfg, permute=True)
+            current_exp += 1
 
+    #save results
     print(cfg['experiment'])
     if cfg['experiment'] == '':
         exp_name = 'test'
@@ -340,29 +328,19 @@ def main(config_file='config.txt', results_file='results.txt', cfg=None):
     if cfg['show_results']:
         if not os.path.exists(cfg['result_dir']):
             os.makedirs(cfg['result_dir'])
-        np.savetxt(join(cfg['result_dir'], cfg['experiment'] + '_W.csv'), W)
-        #show_topics(W, 25, vocab=vocab)
-        #####save_topics(W, join(cfg['result_dir'], cfg['experiment'] + '_topics.txt'), vocab)
-        #plot_matrix(V, 'Documents', labels=labels, vocab=vocab)
-        #filename = os.path.join(cfg['result_dir'], cfg['experiment']+'_V.eps')
-        #plt.savefig(filename, format='eps')
-        #plot_matrix(W, u'Распределение слов в темах', labels, vocab)
-        #filename = os.path.join(cfg['result_dir'], cfg['experiment']+'_W.pdf')
-        #plt.savefig(filename, format='pdf')
+        np.savetxt(os.path.join(cfg['result_dir'], cfg['experiment'] + '_Phi.csv'), Phi)
         
         for i, fun_name in enumerate(cfg['measure'].split(',')):
-            val = np.array([r[:, i] for r in res])
+            val = np.array([r[:, i] for r in results])
             fun = getattr(measure, fun_name + '_name')
-            plot_measure(val.T, fun())
+            visualize.plot_measure(val.T, fun())
             filename = os.path.join(cfg['result_dir'], cfg['experiment']+'_'+fun_name+'.pdf')
             plt.savefig(filename, format='pdf')
         if cfg['compare_real']:
             print('Hellinger res:', hdist_runs[0][-1,0])
-            plot_measure(np.array([r[:, 0] for r in hdist_runs]).T, measure.hellinger_name())
-            ####show_matrices_recovered(W_r, H_r, W, H, cfg, permute=True)
-            #plt.savefig('tm_tests/recovered_cnmf_' + tp + '.eps', format='eps')
-        #plt.show()
-    return res
+            visualize.plot_measure(np.array([r[:, 0] for r in hdist_runs]).T, measure.hellinger_name())
+
+    return results
 
 if __name__ != '__main__':
     main()
@@ -372,35 +350,27 @@ if __name__ == '__main__':
     print("Loading config...")
     cfg = config.load()
     print("Config is loaded")
+
     if not os.path.exists(cfg['result_dir']):
         os.makedirs(cfg['result_dir'])
-    if 1:
-        print("Calculations:")
-        res = main(cfg=cfg)
-        print("Plot graphs")
-        colors = ['r', 'b', 'g', 'm']
-        markers = ['o', '^', 'd', (5,1)]
-        for i, fun_name in enumerate(cfg['measure'].split(',')):
-            plt.figure()
-            val = np.array([r[:, i] for r in res])
-            fun = getattr(measure, fun_name + '_name')
-            plt.ylabel(fun(), fontsize=13)
-            '''if fun_name == 'perplexity':
-                if cfg['data_name'] == 'nips':
-                    plt.ylim(1250, 2750)
-                    plt.yticks(np.arange(1250, 2751, 250))
-                else:
-                    plt.ylim(1000, 2500)
-                    plt.yticks(np.arange(1000, 2501, 250))'''
-            for j in xrange(val.shape[0]):
-                if j==0:
-                    plt.plot(val[j, :], linewidth=2, c=colors[0], marker='o', linestyle='--')
-                else:
-                    plt.plot(val[j, :], linewidth=1, c=colors[1], marker='^', linestyle='--')
-            #for j in xrange(1):
-            #    plt.plot(val[j+1, :], linewidth=2, c=colors[j], marker='^', linestyle='-')
-            plt.legend(['arora-PLSA']+['random-PLSA' for i in xrange(val.shape[0]-1)])#['ALS', 'HALS', 'MU', 'PLSA'])
-            plt.draw()
-            filename = os.path.join(cfg['result_dir'], cfg['experiment']+'_'+fun_name+'.pdf')
-            plt.savefig(filename, format='pdf')
-        plt.show()
+
+    print("Calculations:")
+    results = main(cfg=cfg)
+
+    print("Plot graphs")
+    colors = ['r', 'b', 'g', 'm']
+    markers = ['o', '^', 'd', (5,1)]
+    for i, fun_name in enumerate(cfg['measure'].split(',')):
+        plt.figure()
+        val = np.array([r[:, i] for r in results])
+        fun = getattr(measure, fun_name + '_name')
+        plt.ylabel(fun(), fontsize=13)
+
+        for j in xrange(val.shape[0]):
+            plt.plot(val[j, 1:], linewidth=2, c=colors[0], marker='o', linestyle='--')
+
+        #plt.legend(['arora-PLSA']+['random-PLSA' for i in xrange(val.shape[0]-1)])#['ALS', 'HALS', 'MU', 'PLSA'])
+        plt.draw()
+        filename = os.path.join(cfg['result_dir'], cfg['experiment']+'_'+fun_name+'.pdf')
+        plt.savefig(filename, format='pdf')
+    plt.show()

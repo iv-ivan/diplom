@@ -66,7 +66,7 @@ def reduce_multi_cluster(D, num_clusters, params=config.default_config()):
 def anchor_words(D, loss='L2', params=config.default_config()):
     Q = generate_Q_matrix(D * 100)
     anchors = findAnchors(Q, params['T'], params)
-    print("Anchors:", anchors)
+    print "Anchors: ", anchors
     W, topic_likelihoods = do_recovery(Q, anchors, loss, params)
     return W
 

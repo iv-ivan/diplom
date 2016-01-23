@@ -433,7 +433,9 @@ def nonNegativeRecover(Q, anchors, outfile_name, divergence, max_threads, initia
     
     #normalize the rows of Q_prime
     for v in xrange(V):
-        Q[v,:] = Q[v,:]/Q[v,:].sum()
+        rowSum = Q[v,:].sum()
+        if (rowSum != 0.):
+            Q[v,:] = Q[v,:]/rowSum
 
     s = time.time()
     A = matrix(zeros((V, K)))

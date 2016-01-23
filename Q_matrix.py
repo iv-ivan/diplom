@@ -45,7 +45,7 @@ def generate_Q_matrix(M, words_per_doc=None):
             diag_M = diag_M + M[:, j] / (wpd * (wpd - 1))
             M[:, j] = M[:, j] / np.sqrt(wpd * (wpd - 1))
     
-    Q = np.dot(M, M.T) /numdocs
+    Q = np.dot(M, M.T) / numdocs
     if sparse:
         Q = Q.toarray()
     else:

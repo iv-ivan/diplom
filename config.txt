@@ -43,10 +43,10 @@ theta_sparsity = 0.3
 phi_init = gen_matrix_sparse
 theta_init = gen_matrix_sparse
 
-N = 100 # number of words
+N = 1000 # number of words
 M = 500 # number of documents
-T_0 = 10 # "real" number of topics
-T = 15 # number of topics
+T_0 = 20 # "real" number of topics
+T = 30 # number of topics
 
 # topic matrix params
 
@@ -60,23 +60,23 @@ nkernel = 25
 experiment = nips_30_T25_plsa_p2
 #experiment = test_time
 prepare = 0 # -1 --- no preparation
-prepare_method = 1,2,2,2,2
+prepare_method = 1, 2
 compare_prepare = 0
 compare_methods = 0
 T_begin = 5
 T_end = 100
 T_step = 5
 run_info = 1 # none(0), results(1), run(2)
-runs = 2 # times to run the experiments
+runs = 1, 1000 # times to run the experiments
 schedule = plsa #als,hals,mult,plsa # schedule of methods (no spaces); all methods in methods.py
 measure = frobenius,rmse,perplexity # measures to produce; all methods in measure.py
 finals = mean_pmi,mean_max_pmi,mean_hell,mean_nhell,min_nhell
-compare_real = 1 # compare with real matrices 0, 1
+compare_real = 0 # compare with real matrices 0, 1
 munkres = 1
 normalize_iter = 1 # iteration on what to apply normalization
-save_results = 0
+save_results = 	
 save_file = results.txt
-show_results = 1
+show_results = 0
 result_dir = test/27_05_1/
 save_results = 0
 prepare = 0

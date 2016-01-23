@@ -378,7 +378,7 @@ if __name__ == '__main__':
 
         index_exp_series = 0
         for it, expirement_runs in enumerate([int(x) for x in cfg['runs'].split(",")]):
-            series_stats = calculate_stats(val[index_exp_series:index_exp_series+expirement_runs, 1:])
+            series_stats = calculate_stats(val[index_exp_series:index_exp_series+expirement_runs, 0:])
             plt.plot(series_stats[0], linewidth=2, c=colors[it % len(colors)], label = str(it+1))
             plt.fill_between(range(len(series_stats[0])), series_stats[0] + series_stats[1], series_stats[0] - series_stats[1], alpha = 0.1, facecolor=colors[it % len(colors)])
             plt.plot(series_stats[2], linewidth=0.5, c=colors[it % len(colors)])

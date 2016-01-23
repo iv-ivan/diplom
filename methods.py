@@ -71,12 +71,11 @@ def mult_kl(V, W, H, post='', cfg=config.default_config()):
     return W, H
 
 
-def plsa(V, W, H, post='', cfg=config.default_config()):
+def plsa(F, Phi, Theta, post='', cfg=config.default_config()):
     eps = cfg['eps']
-    tmp = V / maximum(dot(W, H), eps)
-    H = normalize_cols(H * dot(W.T, tmp))
-    W = normalize_cols(W * dot(tmp, H.T))
-    return W, H
+    tmp = F / maximum(dot(Phi, Theta), eps)
+    Theta, Phi = normalize_cols(Theta * dot(Phi.T, tmp)), normalize_cols(Phi * dot(tmp, Theta.T))
+    return Phi, Theta
 
 
 def plsa3D(V, W, H, post='', cfg=config.default_config()):

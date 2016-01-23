@@ -90,14 +90,19 @@ def gen_init(cfg=config.default_config()):
     return (Phi, Theta)
 
 
-def run(V, W, H, W_r=None, H_r=None, cfg=config.default_config()):
+def run(F, Phi, Theta, Phi_r=None, Theta_r=None, cfg=config.default_config()):#run(V, W, H, W_r=None, H_r=None, cfg=config.default_config()):
     """Em-algo method.
        - Return:
-
+       val
+       hdist
+       it
+       Phi
+       Theta
+       status
        - Used params:
 
     """
-    T = H.shape[0]
+    T = Theta.shape[0]
     eps = cfg['eps']
     schedule = cfg['schedule'].split(',')
     meas = cfg['measure'].split(',')
@@ -106,12 +111,12 @@ def run(V, W, H, W_r=None, H_r=None, cfg=config.default_config()):
     
     for i, fun_name in enumerate(meas):
         fun = getattr(measure, fun_name)
-        val[0, i] = fun(V, np.dot(W, H))
+        val[0, i] = fun(F, np.dot(Phi, Theta))
     
     if cfg['compare_real']:
         #m = Munkres()
-        idx = get_permute(W_r, H_r, W, H, cfg['munkres'])
-        hdist[0] = hellinger(W[:, idx[:, 1]], W_r[:, idx[:, 0]]) / T
+        idx = get_permute(Phi_r, Theta_r, Phi, Theta, cfg['munkres'])
+        hdist[0] = hellinger(Phi[:, idx[:, 1]], Phi_r[:, idx[:, 0]]) / T
     if cfg['print_lvl'] > 1:
         print('Initial loss:', val[0])
     status = 0
@@ -120,23 +125,23 @@ def run(V, W, H, W_r=None, H_r=None, cfg=config.default_config()):
     for it in range(cfg['max_iter']):
         if cfg['print_lvl'] > 1:
             print('Iteration', it+1)
-        W_old = deepcopy(W)
-        H_old = deepcopy(H)
+        Phi_old = deepcopy(Phi)
+        Theta_old = deepcopy(Theta)
         method_name = schedule[it % methods_num]
         if cfg['print_lvl'] > 1:
             print('Method:', method_name)
         method = getattr(methods, method_name)
-        (W, H) = method(V, W, H, method_name, cfg)
+        (Phi, Theta) = method(F, Phi, Theta, method_name, cfg)
         if (it+1) % cfg['normalize_iter'] == 0:
-            W = normalize_cols(W)
-            H = normalize_cols(H)
+            Phi = normalize_cols(Phi)
+            Theta = normalize_cols(Theta)
         for j, fun_name in enumerate(meas):
             fun = getattr(measure, fun_name)
-            val[it+1, j] = fun(V, np.dot(W, H))
+            val[it+1, j] = fun(F, np.dot(Phi, Theta))
         
         if cfg['compare_real']:
-            idx = get_permute(W_r, H_r, W, H, cfg['munkres'])
-            hdist[it+1] = hellinger(W[:, idx[:, 1]], W_r[:, idx[:, 0]]) / T
+            idx = get_permute(Phi_r, Theta_r, Phi, Theta, cfg['munkres'])
+            hdist[it+1] = hellinger(Phi[:, idx[:, 1]], Phi_r[:, idx[:, 0]]) / T
         
         if cfg['print_lvl'] > 1:
             print(val[it+1])
@@ -145,7 +150,7 @@ def run(V, W, H, W_r=None, H_r=None, cfg=config.default_config()):
                 print('By cost.')
             status = 1
             break
-        if abs(W_old - W).max() < eps and abs(H_old - H).max() < eps:
+        if abs(Phi_old - Phi).max() < eps and abs(Theta_old - Theta).max() < eps:
             if cfg['print_lvl'] > 1:
                 print('By argument.')
             status = 2
@@ -154,16 +159,16 @@ def run(V, W, H, W_r=None, H_r=None, cfg=config.default_config()):
         #del H_old
     if cfg['print_lvl'] > 1:
         print('Final:')
-    W = normalize_cols(W)
-    H = normalize_cols(H)
+    Phi = normalize_cols(Phi)
+    Theta = normalize_cols(Theta)
     for j, fun_name in enumerate(meas):
         fun = getattr(measure, fun_name)
-        val[it+2:, j] = fun(V, np.dot(W, H))
+        val[it+2:, j] = fun(F, np.dot(Phi, Theta))
     
     if cfg['compare_real']:
-        idx = get_permute(W_r, H_r, W, H, cfg['munkres'])
-        hdist[it+2:] = hellinger(W[:, idx[:, 1]], W_r[:, idx[:, 0]]) / T
-    return (val, hdist, it, W, H, status)
+        idx = get_permute(Phi_r, Theta_r, Phi, Theta, cfg['munkres'])
+        hdist[it+2:] = hellinger(Phi[:, idx[:, 1]], Phi_r[:, idx[:, 0]]) / T
+    return (val, hdist, it, Phi, Theta, status)
 
 def load_dataset(cfg=config.default_config()):
     """Load or generate dataset.

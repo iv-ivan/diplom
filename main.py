@@ -11,6 +11,7 @@ from common import cost, normalize_cols, hellinger, print_head, get_permute
 import visualize
 import data
 import prepare
+import pickle
 #from numpy import linalg
 
 import os
@@ -102,21 +103,24 @@ def run(F, Phi, Theta, Phi_r=None, Theta_r=None, cfg=config.default_config()):
        - Used params:
 
     """
+    F_norm = normalize_cols(F)
     T = Theta.shape[0]
     eps = cfg['eps']
     schedule = cfg['schedule'].split(',')
     meas = cfg['measure'].split(',')
     val = np.zeros((cfg['max_iter']+2, len(meas)))
-    hdist = np.zeros((cfg['max_iter']+2, 1))
+    hdist = np.zeros((2, cfg['max_iter']+2))#Phi - first row, Theta - second
     
     for i, fun_name in enumerate(meas):
         fun = getattr(measure, fun_name)
-        val[0, i] = fun(F, np.dot(Phi, Theta))
+        val[0, i] = fun(F_norm, np.dot(Phi, Theta))
     
     if cfg['compare_real']:
         #m = Munkres()
         idx = get_permute(Phi_r, Theta_r, Phi, Theta, cfg['munkres'])
-        hdist[0] = hellinger(Phi[:, idx[:, 1]], Phi_r[:, idx[:, 0]]) / T
+        hdist[0][0] = hellinger(Phi[:, idx[:, 1]], Phi_r[:, idx[:, 0]]) / T
+        hdist[1][0] = hellinger(Theta[idx[:, 1],:], Theta_r[idx[:, 0],:]) / T
+
     if cfg['print_lvl'] > 1:
         print('Initial loss:', val[0])
     status = 0
@@ -137,11 +141,12 @@ def run(F, Phi, Theta, Phi_r=None, Theta_r=None, cfg=config.default_config()):
             Theta = normalize_cols(Theta)
         for j, fun_name in enumerate(meas):
             fun = getattr(measure, fun_name)
-            val[it+1, j] = fun(F, np.dot(Phi, Theta))
+            val[it+1, j] = fun(F_norm, np.dot(Phi, Theta))
         
         if cfg['compare_real']:
             idx = get_permute(Phi_r, Theta_r, Phi, Theta, cfg['munkres'])
-            hdist[it+1] = hellinger(Phi[:, idx[:, 1]], Phi_r[:, idx[:, 0]]) / T
+            hdist[0][it+1] = hellinger(Phi[:, idx[:, 1]], Phi_r[:, idx[:, 0]]) / T
+            hdist[1][it+1] = hellinger(Theta[idx[:, 1], :], Theta_r[idx[:, 0], :]) / T
         
         if cfg['print_lvl'] > 1:
             print(val[it+1])
@@ -163,12 +168,20 @@ def run(F, Phi, Theta, Phi_r=None, Theta_r=None, cfg=config.default_config()):
     Theta = normalize_cols(Theta)
     for j, fun_name in enumerate(meas):
         fun = getattr(measure, fun_name)
-        val[it+2:, j] = fun(F, np.dot(Phi, Theta))
+        val[it+2:, j] = fun(F_norm, np.dot(Phi, Theta))
     
     if cfg['compare_real']:
         idx = get_permute(Phi_r, Theta_r, Phi, Theta, cfg['munkres'])
-        hdist[it+2:] = hellinger(Phi[:, idx[:, 1]], Phi_r[:, idx[:, 0]]) / T
+        hdist[0][it+2:] = hellinger(Phi[:, idx[:, 1]], Phi_r[:, idx[:, 0]]) / T
+        hdist[1][it+2:] = hellinger(Theta[idx[:, 1],:], Theta_r[idx[:, 0], :]) / T
+
     return (val, hdist, it, Phi, Theta, status)
+
+def merge_halfmodel(F, Phi_r, Theta_r, cfg):
+	F_model = np.dot(np.dot(Phi_r, Theta_r), np.diag(np.sum(F, axis=0)))
+	alpha = cfg["alpha"]
+	return F*alpha + F_model*(1-alpha)
+
 
 def load_dataset(cfg=config.default_config()):
     """Load or generate dataset.
@@ -187,15 +200,24 @@ def load_dataset(cfg=config.default_config()):
         print("uci")
         F, vocab = data.load_uci(cfg['data_name'], cfg)
         N, M = F.shape
-        F = normalize_cols(F)
         cfg['N'], cfg['M'] = F.shape
         print('Dimensions of F:', N, M)
         print('Checking assumption on F:', np.sum(F, axis=0).max())
         return F, vocab, N, M, None, None
-    else:
+    elif cfg['load_data'] == 2:
         F, Phi_r, Theta_r = gen_real(cfg)
         print('Checking assumption on F:', np.sum(F, axis=0).max())
         return F, None, F.shape[0], F.shape[1], Phi_r, Theta_r
+    elif cfg['load_data'] == 3:
+    	print("uci halfmodel")
+        F, vocab = data.load_uci(cfg['data_name'], cfg)
+        N, M = F.shape
+        cfg['N'], cfg['M'] = F.shape
+        Phi_r, Theta_r = load_obj(cfg['matrices_names'].split(' ')[0]), load_obj(cfg['matrices_names'].split(' ')[1])
+        F_merged = merge_halfmodel(F, Phi_r, Theta_r, cfg)
+        print('Dimensions of F:', N, M)
+        print('Checking assumption on F:', np.sum(F_merged, axis=0).max())
+        return F_merged, vocab, N, M, Phi_r, Theta_r
 
 def initialize_matrices(i, F, cfg=config.default_config()):
     """Initialize matrices Phi Theta.
@@ -208,9 +230,10 @@ def initialize_matrices(i, F, cfg=config.default_config()):
     if (int(cfg['prepare_method'].split(',')[i]) == 1):
         print("Arora")
         eps = cfg['eps']
-        Phi = prepare.anchor_words(F, 'L2', cfg)
+        F_norm = normalize_cols(F)
+        Phi = prepare.anchor_words(F_norm, 'L2', cfg)
         print('Solving for Theta')
-        Theta = np.linalg.solve(np.dot(Phi.T, Phi) + np.eye(Phi.shape[1]) * eps, np.dot(Phi.T, F))
+        Theta = np.linalg.solve(np.dot(Phi.T, Phi) + np.eye(Phi.shape[1]) * eps, np.dot(Phi.T, F_norm))
         Theta[Theta < eps] = 0
         Theta = normalize_cols(Theta)
         return Phi, Theta
@@ -224,6 +247,14 @@ def calculate_stats(series):
     series_min = series[np.argmin(series[:,-1]),:]
     series_max = series[np.argmax(series[:,-1]),:]
     return series_mean, np.sqrt(series_var), series_min, series_max
+
+def save_obj(obj, name ):
+    with open('./'+ name + '.pkl', 'wb') as f:
+        pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
+
+def load_obj(name ):
+    with open('./' + name + '.pkl', 'rb') as f:
+        return pickle.load(f)
 
 def main(config_file='config.txt', results_file='results.txt', cfg=None):
     """Main function which runs experiments.
@@ -241,6 +272,7 @@ def main(config_file='config.txt', results_file='results.txt', cfg=None):
        schedule
        compare_real
        save_topics
+       save_matrices
     """
     if cfg == None:
         cfg = config.load(config_file)
@@ -328,10 +360,14 @@ def main(config_file='config.txt', results_file='results.txt', cfg=None):
                 print(name, ':', val)
 
             #save results for different runs
+            if int(cfg['save_matrices'].split(",")[it]) == 1 and r == 0:
+            	save_obj(Phi, 'Phi')
+            	save_obj(Theta, 'Theta')
+
             if cfg['save_topics']:
                 visualize.save_topics(Phi, os.path.join(cfg['result_dir'], cfg['experiment'] + '_'+str(current_exp)+'topics.txt'), vocab)
             if cfg['compare_real']:
-                visualize.show_matrices_recovered(Phi_r, Theta_r, Phi, Theta, cfg, permute=True)
+                pass#visualize.show_matrices_recovered(Phi_r, Theta_r, Phi, Theta, cfg, permute=True)
             current_exp += 1
 
     #save results section

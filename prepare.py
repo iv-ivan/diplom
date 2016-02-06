@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from numpy import *
-#from sklearn.cluster import KMeans
+from sklearn.cluster import KMeans
 #from yael import ynumpy
 
 import config
@@ -31,19 +31,19 @@ def reduce_tsne(D, to_dim=2):
     return array([x for x in bh_tsne(D, verbose=True)])
 
 
-'''def reduce_cluster(D, num_clusters, params=config.default_config()):
+def reduce_cluster(D, num_clusters, params=config.default_config()):
     print('Clustering:')
-    D = ascontiguousarray(D.astype('float32'))
-    centroids, qerr, dis, labels, nassign = ynumpy.kmeans(D, num_clusters, init='kmeans++', nt=params['num_threads'], output='all', redo=3, niter=params['kmeans_max_iter'], verbose=False)
-    #kmeans = KMeans(n_init=1, n_clusters=params['num_clusters'], n_jobs=2, max_iter=params['kmeans_max_iter'])
-    #kmeans.fit(D)
+    #D = ascontiguousarray(D.astype('float32'))
+    #centroids, qerr, dis, labels, nassign = ynumpy.kmeans(D, num_clusters, init='kmeans++', nt=params['num_threads'], output='all', redo=3, niter=params['kmeans_max_iter'], verbose=False)
+    kmeans = KMeans(n_init=1, n_clusters=num_clusters, n_jobs=1, max_iter=params['kmeans_max_iter'])
+    kmeans.fit(D)
     print('Done.')
-    #centroids = kmeans.cluster_centers_
-    #labels = kmeans.labels_
+    centroids = kmeans.cluster_centers_
+    labels = kmeans.labels_
     return centroids, labels
 
 
-def reduce_multi_cluster(D, num_clusters, params=config.default_config()):
+'''def reduce_multi_cluster(D, num_clusters, params=config.default_config()):
     print('Clustering:')
     D = ascontiguousarray(D.astype('float32'))
     #ncc = maximum(minimum(random.poisson(num_clusters, 15), 1000), 15)

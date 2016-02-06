@@ -21,7 +21,7 @@ import matplotlib as ml
 from datetime import datetime, timedelta
 from time import time
 from copy import deepcopy
-
+from sklearn.feature_extraction.text import TfidfTransformer
 
 def gen_real(cfg=config.default_config()):
     """Generate matrices with real values for model experiment.
@@ -219,6 +219,33 @@ def load_dataset(cfg=config.default_config()):
         print('Checking assumption on F:', np.sum(F_merged, axis=0).max())
         return F_merged, vocab, N, M, Phi_r, Theta_r
 
+def construct_from_svd(U, s, V, cfg):
+    T = cfg['T']
+    Phi = np.zeros((U.shape[0], T))
+    Theta = np.zeros((T, V.shape[1]))
+    for i in xrange(T):
+        x = U[:, i]
+        y = V[:, i]
+        xp = np.copy(x)
+        xp[xp < 0] = 0
+        xn = (-1)*np.copy(x)
+        xn[xn < 0] = 0
+        yp = np.copy(y)
+        yp[yp < 0] = 0
+        yn = (-1)*np.copy(y)
+        yn[yn < 0] = 0
+        xp_norm = np.linalg.norm(xp, ord=1)
+        yp_norm = np.linalg.norm(yp, ord=1)
+        xn_norm = np.linalg.norm(xn, ord=1)
+        yn_norm = np.linalg.norm(yn, ord=1)
+        if xp_norm*yp_norm > xn_norm*yn_norm:
+            Phi[:, i] = np.sqrt(s[i]*xp_norm*yp_norm)*xp/xp_norm
+            Theta[i, :] = np.sqrt(s[i]*xp_norm*yp_norm)*np.transpose(yp)/yp_norm
+        else:
+            Phi[:, i] = np.sqrt(s[i]*xn_norm*yn_norm)*xn/xn_norm
+            Theta[i, :] = np.sqrt(s[i]*xn_norm*yn_norm)*np.transpose(yn)/yn_norm
+    return Phi, Theta
+
 def initialize_matrices(i, F, cfg=config.default_config()):
     """Initialize matrices Phi Theta.
        - Return:
@@ -240,6 +267,42 @@ def initialize_matrices(i, F, cfg=config.default_config()):
     elif (int(cfg['prepare_method'].split(',')[i]) == 2):
         print("Random")
         return gen_init(cfg)
+    elif (int(cfg['prepare_method'].split(',')[i]) == 3):
+        eps = cfg['eps']
+        F_norm = normalize_cols(F)
+        print("Clustering of words")
+        centroids, labels = prepare.reduce_cluster(F_norm, cfg['T'], cfg)
+        Theta = centroids
+        Theta[Theta < eps] = 0
+        Theta = normalize_cols(Theta)
+        print('Solving for Phi')
+        Phi = np.transpose(np.linalg.solve(np.dot(Theta, Theta.T) + np.eye((Theta.T).shape[1]) * eps, np.dot(Theta, F_norm.T)))
+        Phi[Phi < eps] = 0
+        Phi = normalize_cols(Phi)
+        return Phi, Theta
+    elif (int(cfg['prepare_method'].split(',')[i]) == 4):
+        eps = cfg['eps']
+        F_norm = normalize_cols(F)
+        print("SVD init")
+        U, s, V = np.linalg.svd(F_norm)
+        Phi, Theta = construct_from_svd(U, s, V, cfg)
+        return Phi, Theta
+    elif (int(cfg['prepare_method'].split(',')[i]) == 5):#TODO
+        eps = cfg['eps']
+        transformer = TfidfTransformer(norm='l1')
+        transformer.fit(F)
+        F_tfidf = (transformer.transform(F)).toarray()
+        print("Clustering of tf-idf")
+        centroids, labels = prepare.reduce_cluster(F_tfidf, cfg['T'], cfg)
+        Theta = centroids
+        Theta[Theta < eps] = 0
+        Theta = normalize_cols(Theta)
+        print('Solving for Phi')
+        Phi = np.transpose(np.linalg.solve(np.dot(Theta, Theta.T) + np.eye((Theta.T).shape[1]) * eps, np.dot(Theta, F_tfidf.T)))
+        Phi[Phi < eps] = 0
+        Phi = normalize_cols(Phi)
+        return Phi, Theta
+
 
 def calculate_stats(series):
     series_mean = np.mean(series, axis=0)
@@ -370,14 +433,49 @@ def main(config_file='config.txt', results_file='results.txt', cfg=None):
                 pass#visualize.show_matrices_recovered(Phi_r, Theta_r, Phi, Theta, cfg, permute=True)
             current_exp += 1
 
+    hdist_runs = np.array(hdist_runs)
     #save results section
     if cfg['experiment'] == '':
         exp_name = 'test'
     else:
         exp_name = cfg['experiment']
 
+    if cfg['compare_real']:
+        index_exp_series = 0
+        plt.figure()
+        colors = ['r', 'b', 'g', 'm']
+        for it, expirement_runs in enumerate([int(x) for x in cfg['runs'].split(",")]):
+            #Phi
+            series_stats = calculate_stats(hdist_runs[index_exp_series:index_exp_series+expirement_runs, 0, 0:])
+            plt.plot(series_stats[0], linewidth=2, c=colors[it % len(colors)], label = str(it+1)+" Phi")
+            plt.fill_between(range(len(series_stats[0])), series_stats[0] + series_stats[1], series_stats[0] - series_stats[1], alpha = 0.1, facecolor=colors[it % len(colors)])
+            plt.plot(series_stats[2], linewidth=0.5, c=colors[it % len(colors)])
+            plt.plot(series_stats[3], linewidth=0.5, c=colors[it % len(colors)])
+            index_exp_series += expirement_runs
+
+        plt.legend()
+        plt.draw()
+        filename = os.path.join(cfg['result_dir'], cfg['experiment']+'_Phi'+'.pdf')
+        plt.savefig(filename, format='pdf')
+
+        plt.figure()
+        index_exp_series = 0
+        colors = ['r', 'b', 'g', 'm']
+        for it, expirement_runs in enumerate([int(x) for x in cfg['runs'].split(",")]):
+            #Theta
+            series_stats = calculate_stats(hdist_runs[index_exp_series:index_exp_series+expirement_runs, 1, 0:])
+            plt.plot(series_stats[0], linewidth=2, c=colors[it % len(colors)], label = str(it+1)+" Theta")
+            plt.fill_between(range(len(series_stats[0])), series_stats[0] + series_stats[1], series_stats[0] - series_stats[1], alpha = 0.1, facecolor=colors[it % len(colors)])
+            plt.plot(series_stats[2], linewidth=0.5, c=colors[it % len(colors)])
+            plt.plot(series_stats[3], linewidth=0.5, c=colors[it % len(colors)])
+            index_exp_series += expirement_runs
+
+        plt.legend()
+        plt.draw()
+        filename = os.path.join(cfg['result_dir'], cfg['experiment']+'_Theta'+'.pdf')
+        plt.savefig(filename, format='pdf')
     #TODO:check
-    if cfg['show_results']:
+    '''if cfg['show_results']:
         if not os.path.exists(cfg['result_dir']):
             os.makedirs(cfg['result_dir'])
         np.savetxt(os.path.join(cfg['result_dir'], cfg['experiment'] + '_Phi.csv'), Phi)
@@ -390,7 +488,7 @@ def main(config_file='config.txt', results_file='results.txt', cfg=None):
             plt.savefig(filename, format='pdf')
         if cfg['compare_real']:
             print('Hellinger res:', hdist_runs[0][-1,0])
-            visualize.plot_measure(np.array([r[:, 0] for r in hdist_runs]).T, measure.hellinger_name())
+            visualize.plot_measure(np.array([r[:, 0] for r in hdist_runs]).T, measure.hellinger_name())'''
 
     return results
 

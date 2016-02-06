@@ -22,6 +22,7 @@ def plot_measure(measure, name=None, title=None, fig=None):
     if title != None:
         plt.title(title)
     plt.plot(measure, linewidth=2)
+    plt.legend()
     #plt.legend(['no preparation', 'anchor for W', 'kmeans for H', 'kmeans + anchor for W', 'tSNE4 for W', 'tSNE3 for W', 'tSNE2 for W'])
     #plt.legend(['ALS', 'Block', 'PLSA', 'ALS with preparation', 'Block with preparation', 'PLSA with preparation'])
     #plt.legend(['ALS', 'MU', 'Block', 'PLSA'])#, 'ALS with preparation', 'Block with preparation', 'PLSA with preparation'])

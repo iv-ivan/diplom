@@ -59,7 +59,7 @@ def Projection_Find(M_orig, r, candidates):
                 anchor_words[j + 1] = M_orig[i]
                 anchor_indices[j + 1] = i
                 basis[j] = M[i]/np.sqrt(np.dot(M[i], M[i]))
-                
+  
     # convert numpy array to python list
     anchor_indices_list = []
     for i in range(r):

@@ -218,6 +218,12 @@ def load_dataset(cfg=config.default_config()):
         print('Dimensions of F:', N, M)
         print('Checking assumption on F:', np.sum(F_merged, axis=0).max())
         return F_merged, vocab, N, M, Phi_r, Theta_r
+    elif cfg['load_data'] == 4:
+        F = np.eye(cfg['T'])
+        cfg['N'], cfg['M'] = F.shape
+        Phi_r = np.eye(cfg['T'])
+        Theta_r = np.eye(cfg['T'])
+        return F, None, cfg['T'], cfg['T'], Phi_r, Theta_r
 
 def construct_from_svd(U, s, V, cfg):
     T = cfg['T']
@@ -225,7 +231,7 @@ def construct_from_svd(U, s, V, cfg):
     Theta = np.zeros((T, V.shape[1]))
     for i in xrange(T):
         x = U[:, i]
-        y = V[:, i]
+        y = V[i, :]
         xp = np.copy(x)
         xp[xp < 0] = 0
         xn = (-1)*np.copy(x)
@@ -240,11 +246,11 @@ def construct_from_svd(U, s, V, cfg):
         yn_norm = np.linalg.norm(yn, ord=1)
         if xp_norm*yp_norm > xn_norm*yn_norm:
             Phi[:, i] = np.sqrt(s[i]*xp_norm*yp_norm)*xp/xp_norm
-            Theta[i, :] = np.sqrt(s[i]*xp_norm*yp_norm)*np.transpose(yp)/yp_norm
+            Theta[i, :] = np.sqrt(s[i]*xp_norm*yp_norm)*yp/yp_norm
         else:
             Phi[:, i] = np.sqrt(s[i]*xn_norm*yn_norm)*xn/xn_norm
-            Theta[i, :] = np.sqrt(s[i]*xn_norm*yn_norm)*np.transpose(yn)/yn_norm
-    return Phi, Theta
+            Theta[i, :] = np.sqrt(s[i]*xn_norm*yn_norm)*yn/yn_norm
+    return normalize_cols(Phi), normalize_cols(Theta)
 
 def initialize_matrices(i, F, cfg=config.default_config()):
     """Initialize matrices Phi Theta.
@@ -287,9 +293,9 @@ def initialize_matrices(i, F, cfg=config.default_config()):
         U, s, V = np.linalg.svd(F_norm)
         Phi, Theta = construct_from_svd(U, s, V, cfg)
         return Phi, Theta
-    elif (int(cfg['prepare_method'].split(',')[i]) == 5):#TODO
+    elif (int(cfg['prepare_method'].split(',')[i]) == 5):
         eps = cfg['eps']
-        transformer = TfidfTransformer(norm='l1')
+        transformer = TfidfTransformer()
         transformer.fit(F)
         F_tfidf = (transformer.transform(F)).toarray()
         print("Clustering of tf-idf")
@@ -305,6 +311,7 @@ def initialize_matrices(i, F, cfg=config.default_config()):
 
 
 def calculate_stats(series):
+    series = series[:, 1:]
     series_mean = np.mean(series, axis=0)
     series_var = np.var(series, axis=0)
     series_min = series[np.argmin(series[:,-1]),:]
@@ -443,7 +450,7 @@ def main(config_file='config.txt', results_file='results.txt', cfg=None):
     if cfg['compare_real']:
         index_exp_series = 0
         plt.figure()
-        colors = ['r', 'b', 'g', 'm']
+        colors = ['r', 'b', 'g', 'm', 'c', 'y', 'k']
         for it, expirement_runs in enumerate([int(x) for x in cfg['runs'].split(",")]):
             #Phi
             series_stats = calculate_stats(hdist_runs[index_exp_series:index_exp_series+expirement_runs, 0, 0:])
@@ -460,7 +467,6 @@ def main(config_file='config.txt', results_file='results.txt', cfg=None):
 
         plt.figure()
         index_exp_series = 0
-        colors = ['r', 'b', 'g', 'm']
         for it, expirement_runs in enumerate([int(x) for x in cfg['runs'].split(",")]):
             #Theta
             series_stats = calculate_stats(hdist_runs[index_exp_series:index_exp_series+expirement_runs, 1, 0:])
@@ -507,7 +513,7 @@ if __name__ == '__main__':
     results = main(cfg=cfg)
 
     print("Plot graphs")
-    colors = ['r', 'b', 'g', 'm']
+    colors = ['r', 'b', 'g', 'm', 'c', 'y', 'k']
     markers = ['o', '^', 'd', (5,1)]
     for i, fun_name in enumerate(cfg['measure'].split(',')):
         plt.figure()

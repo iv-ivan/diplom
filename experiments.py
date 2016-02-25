@@ -67,5 +67,10 @@ def experiment():
                     res = main.main(cfg=cfg)
                     plt.close('all')
     
+def ivan_experiment():
+    cfg = config.load('config.txt')
+    cfg['expirement'] = "all_initializations"
+    res = main.main(cfg=cfg)
+
 if __name__ == '__main__':
-    experiment()
+    ivan_experiment()

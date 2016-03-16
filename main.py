@@ -22,6 +22,7 @@ from datetime import datetime, timedelta
 from time import time
 from copy import deepcopy
 from sklearn.feature_extraction.text import TfidfTransformer
+from shutil import copyfile
 
 def gen_real(cfg=config.default_config()):
     """Generate matrices with real values for model experiment.
@@ -374,7 +375,7 @@ def main(config_file='config.txt', results_file='results.txt', cfg=None):
     #loading expirement information
     total_runs = sum([int(x) for x in cfg['runs'].split(",")])
     results = [0] * total_runs #res==results, different quality measures arrays
-    finals = [0] * total_runs
+    finals = [[] for i in cfg['finals'].split(',')] # pmi, mean pmi etc
     hdist_runs = [0] * total_runs #hellinger distances arrays
     exp_time = [0] * total_runs #time for run EM-algo
 
@@ -427,6 +428,7 @@ def main(config_file='config.txt', results_file='results.txt', cfg=None):
             for i, fun_name in enumerate(cfg['finals'].split(',')):
                 fun = getattr(measure, fun_name)
                 name, val = fun(Phi, Theta)
+                finals[i].append(val)
                 print(name, ':', val)
 
             #save results for different runs
@@ -496,7 +498,7 @@ def main(config_file='config.txt', results_file='results.txt', cfg=None):
             print('Hellinger res:', hdist_runs[0][-1,0])
             visualize.plot_measure(np.array([r[:, 0] for r in hdist_runs]).T, measure.hellinger_name())'''
 
-    return results
+    return results, finals
 
 if __name__ != '__main__':
     main()
@@ -510,11 +512,27 @@ if __name__ == '__main__':
         os.makedirs(cfg['result_dir'])
 
     print("Calculations:")
-    results = main(cfg=cfg)
+    results, finals = main(cfg=cfg)
 
     print("Plot graphs")
     colors = ['r', 'b', 'g', 'm', 'c', 'y', 'k']
     markers = ['o', '^', 'd', (5,1)]
+
+    with open(os.path.join(cfg['result_dir'], cfg['experiment']+'_finals.txt'),"w") as f:
+        for i, fun_name in enumerate(cfg['finals'].split(',')):
+            fun = getattr(measure, fun_name)
+            name, val = fun(np.array([[1]]), np.array([[1]]))
+            index_exp_series = 0
+            for it, expirement_runs in enumerate([int(x) for x in cfg['runs'].split(",")]):
+                series_mean = np.mean(finals[i][index_exp_series:index_exp_series+expirement_runs])
+                series_max = np.max(finals[i][index_exp_series:index_exp_series+expirement_runs])
+                series_min = np.min(finals[i][index_exp_series:index_exp_series+expirement_runs])
+                f.write(str(it+1)+" "+str(name)+" "+str(series_mean)+" "+str(series_max)+" "+str(series_min)+"\n")
+                index_exp_series += expirement_runs
+            f.write('\n')
+
+    copyfile("config.txt", os.path.join(cfg['result_dir'], cfg['experiment']+'_config.txt'))
+
     for i, fun_name in enumerate(cfg['measure'].split(',')):
         plt.figure()
         val = np.array([r[:, i] for r in results])

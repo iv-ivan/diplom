@@ -13,7 +13,7 @@ def gen_matrix_normal(params):
     return normalize_cols(abs(np.random.randn(params['rows'], params['cols'])))
 
 
-def gen_matrix_sparse(params):
+def gen_matrix_sparse_old(params):
     rows = params['rows']
     cols = params['cols']
     sparsity = params['sparsity']
@@ -33,6 +33,14 @@ def gen_matrix_sparse(params):
         M[:cols, :] = M[:cols, :] + np.eye(cols) * params['eps']
     return normalize_cols(M)
 
+def gen_matrix_sparse(params):
+    rows = params['rows']
+    cols = params['cols']
+    sparsity = params['sparsity']
+    M = np.zeros((rows, cols), dtype='float32')
+    for i in xrange(cols):
+        M[:, i] = np.random.dirichlet([sparsity]*rows)
+    return normalize_cols(M)
 
 def gen_documents(V, params):
     N, M = V.shape

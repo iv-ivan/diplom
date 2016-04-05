@@ -2,8 +2,8 @@
 
 eps = 1e-7
 max_iter = 40
-seed = 445#444
-num_threads = 4
+seed = 445
+num_threads = -1
 
 # kmeans params
 
@@ -18,9 +18,9 @@ new_dim = 1000
 # data params
 
 data_dir = datasets
-load_data = 3 #uci # 1, uci - uci format, 2 - random, 3 - halfmodel, 4 - diagonal with T
-data_name = kos
-matrices_names = Phi Theta
+load_data = 2 #uci # 1, uci - uci format, 2 - random, 3 - halfmodel, 4 - diagonal with T
+data_name = nips
+matrices_names = Phi_nips Theta_nips
 alpha = 0.8
 gen_name = 0_1_100_16_500
 
@@ -36,11 +36,14 @@ cnmf_beta = 0.21
 
 # matrix parameters
 
-gen_phi = gen_matrix_topic
+#gen_phi = gen_matrix_topic
+gen_phi = gen_matrix_sparse
 gen_theta = gen_matrix_sparse
 gen_documents = 1
-phi_sparsity = 0.2
-theta_sparsity = 0.3
+real_phi_sparsity = 0.1
+real_theta_sparsity = 0.5#0.3
+phi_sparsity = 0.04
+theta_sparsity = 0.3#0.3
 
 phi_init = gen_matrix_sparse
 theta_init = gen_matrix_sparse
@@ -69,7 +72,7 @@ T_begin = 5
 T_end = 100
 T_step = 5
 run_info = 1 # none(0), results(1), run(2)
-runs = 15, 15, 15, 1, 15# times to run the experiments
+runs = 15, 15, 15, 1, 10# times to run the experiments
 schedule = plsa #als,hals,mult,plsa # schedule of methods (no spaces); all methods in methods.py
 measure = frobenius,rmse,perplexity # measures to produce; all methods in measure.py
 finals = mean_pmi,mean_max_pmi,mean_hell,mean_nhell,min_nhell
@@ -81,6 +84,8 @@ save_file = results.txt
 save_matrices = 0, 0, 0, 0, 0 #array for every prepare_method
 show_results = 0
 save_topics = 0
-result_dir = test/real_test_05_03_16_kos_08/
+result_dir = test/05_04_16_random_new_hell/
 save_results = 0
 prepare = 0
+
+begin_graph_iter = 1

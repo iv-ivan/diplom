@@ -56,6 +56,7 @@ def gen_real(cfg=config.default_config()):
     Theta_r = gen_theta(cfg)
 
     F = np.dot(Phi_r, Theta_r)
+
     return (F, Phi_r, Theta_r)
 
 
@@ -80,13 +81,13 @@ def gen_init(cfg=config.default_config()):
     gen_phi = getattr(generators, cfg['phi_init'])
     cfg['rows'] = N
     cfg['cols'] = T
-    cfg['sparsity'] = cfg['phi_sparsity']
+    cfg['sparsity'] = cfg['real_phi_sparsity']
     Phi = gen_phi(cfg)
 
     gen_theta = getattr(generators, cfg['theta_init'])
     cfg['rows'] = T
     cfg['cols'] = M
-    cfg['sparsity'] = cfg['theta_sparsity']
+    cfg['sparsity'] = cfg['real_theta_sparsity']
     Theta = gen_theta(cfg)
 
     return (Phi, Theta)
@@ -104,7 +105,7 @@ def run(F, Phi, Theta, Phi_r=None, Theta_r=None, cfg=config.default_config()):
        - Used params:
 
     """
-    F_norm = normalize_cols(F)
+    #F_norm = normalize_cols(F)
     T = Theta.shape[0]
     eps = cfg['eps']
     schedule = cfg['schedule'].split(',')
@@ -114,7 +115,7 @@ def run(F, Phi, Theta, Phi_r=None, Theta_r=None, cfg=config.default_config()):
     
     for i, fun_name in enumerate(meas):
         fun = getattr(measure, fun_name)
-        val[0, i] = fun(F_norm, np.dot(Phi, Theta))
+        val[0, i] = fun(F, np.dot(Phi, Theta))
     
     if cfg['compare_real']:
         #m = Munkres()
@@ -142,12 +143,12 @@ def run(F, Phi, Theta, Phi_r=None, Theta_r=None, cfg=config.default_config()):
             Theta = normalize_cols(Theta)
         for j, fun_name in enumerate(meas):
             fun = getattr(measure, fun_name)
-            val[it+1, j] = fun(F_norm, np.dot(Phi, Theta))
+            val[it+1, j] = fun(F, np.dot(Phi, Theta))#fun(F_norm, np.dot(Phi, Theta))
         
         if cfg['compare_real']:
             idx = get_permute(Phi_r, Theta_r, Phi, Theta, cfg['munkres'])
-            hdist[0][it+1] = hellinger(Phi[:, idx[:, 1]], Phi_r[:, idx[:, 0]]) / T
-            hdist[1][it+1] = hellinger(Theta[idx[:, 1], :], Theta_r[idx[:, 0], :]) / T
+            hdist[0][it+1] = hellinger(Phi[:, idx[:, 1]], Phi_r[:, idx[:, 0]])
+            hdist[1][it+1] = hellinger(Theta[idx[:, 1], :], Theta_r[idx[:, 0], :])
         
         if cfg['print_lvl'] > 1:
             print(val[it+1])
@@ -169,12 +170,12 @@ def run(F, Phi, Theta, Phi_r=None, Theta_r=None, cfg=config.default_config()):
     Theta = normalize_cols(Theta)
     for j, fun_name in enumerate(meas):
         fun = getattr(measure, fun_name)
-        val[it+2:, j] = fun(F_norm, np.dot(Phi, Theta))
+        val[it+2:, j] = fun(F, np.dot(Phi, Theta))#fun(F_norm, np.dot(Phi, Theta))
     
     if cfg['compare_real']:
         idx = get_permute(Phi_r, Theta_r, Phi, Theta, cfg['munkres'])
-        hdist[0][it+2:] = hellinger(Phi[:, idx[:, 1]], Phi_r[:, idx[:, 0]]) / T
-        hdist[1][it+2:] = hellinger(Theta[idx[:, 1],:], Theta_r[idx[:, 0], :]) / T
+        hdist[0][it+2:] = hellinger(Phi[:, idx[:, 1]], Phi_r[:, idx[:, 0]])
+        hdist[1][it+2:] = hellinger(Theta[idx[:, 1],:], Theta_r[idx[:, 0], :])
 
     return (val, hdist, it, Phi, Theta, status)
 
@@ -311,8 +312,8 @@ def initialize_matrices(i, F, cfg=config.default_config()):
         return Phi, Theta
 
 
-def calculate_stats(series):
-    series = series[:, 1:]
+def calculate_stats(series, begin_iter):
+    series = series[:, begin_iter:]
     series_mean = np.mean(series, axis=0)
     series_var = np.var(series, axis=0)
     series_min = series[np.argmin(series[:,-1]),:]
@@ -455,7 +456,7 @@ def main(config_file='config.txt', results_file='results.txt', cfg=None):
         colors = ['r', 'b', 'g', 'm', 'c', 'y', 'k']
         for it, expirement_runs in enumerate([int(x) for x in cfg['runs'].split(",")]):
             #Phi
-            series_stats = calculate_stats(hdist_runs[index_exp_series:index_exp_series+expirement_runs, 0, 0:])
+            series_stats = calculate_stats(hdist_runs[index_exp_series:index_exp_series+expirement_runs, 0, 0:], cfg['begin_graph_iter'])
             plt.plot(series_stats[0], linewidth=2, c=colors[it % len(colors)], label = str(it+1)+" Phi")
             plt.fill_between(range(len(series_stats[0])), series_stats[0] + series_stats[1], series_stats[0] - series_stats[1], alpha = 0.1, facecolor=colors[it % len(colors)])
             plt.plot(series_stats[2], linewidth=0.5, c=colors[it % len(colors)])
@@ -471,7 +472,7 @@ def main(config_file='config.txt', results_file='results.txt', cfg=None):
         index_exp_series = 0
         for it, expirement_runs in enumerate([int(x) for x in cfg['runs'].split(",")]):
             #Theta
-            series_stats = calculate_stats(hdist_runs[index_exp_series:index_exp_series+expirement_runs, 1, 0:])
+            series_stats = calculate_stats(hdist_runs[index_exp_series:index_exp_series+expirement_runs, 1, 0:], cfg['begin_graph_iter'])
             plt.plot(series_stats[0], linewidth=2, c=colors[it % len(colors)], label = str(it+1)+" Theta")
             plt.fill_between(range(len(series_stats[0])), series_stats[0] + series_stats[1], series_stats[0] - series_stats[1], alpha = 0.1, facecolor=colors[it % len(colors)])
             plt.plot(series_stats[2], linewidth=0.5, c=colors[it % len(colors)])
@@ -502,7 +503,7 @@ def main(config_file='config.txt', results_file='results.txt', cfg=None):
 
 if __name__ != '__main__':
     main()
-    plt.show()
+    #plt.show()
 
 if __name__ == '__main__':
     print("Loading config...")
@@ -541,7 +542,7 @@ if __name__ == '__main__':
 
         index_exp_series = 0
         for it, expirement_runs in enumerate([int(x) for x in cfg['runs'].split(",")]):
-            series_stats = calculate_stats(val[index_exp_series:index_exp_series+expirement_runs, 0:])
+            series_stats = calculate_stats(val[index_exp_series:index_exp_series+expirement_runs, 0:], cfg['begin_graph_iter'])
             plt.plot(series_stats[0], linewidth=2, c=colors[it % len(colors)], label = str(it+1))
             plt.fill_between(range(len(series_stats[0])), series_stats[0] + series_stats[1], series_stats[0] - series_stats[1], alpha = 0.1, facecolor=colors[it % len(colors)])
             plt.plot(series_stats[2], linewidth=0.5, c=colors[it % len(colors)])
@@ -553,4 +554,4 @@ if __name__ == '__main__':
 
         filename = os.path.join(cfg['result_dir'], cfg['experiment']+'_'+fun_name+'.pdf')
         plt.savefig(filename, format='pdf')
-    plt.show()
+    #plt.show()

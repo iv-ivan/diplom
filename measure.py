@@ -7,17 +7,25 @@ from numpy import *
 
 # metrics
 
-def perplexity(A, B):
+def perplexity_old(A, B):
     return exp(-sum(A * log(maximum(B, 1e-7))) / maximum(sum(A), 1e-7))
 
+def perplexity(A, B):
+    return exp(-sum(A * log(maximum(B, 1e-7))) / maximum(sum(A), 1e-7))
 
 def perplexity_name():
     return u'Перплексия'
 
 
 def frobenius(A, B):
-   return sqrt(sum((A - B) ** 2))
+    Z = copy(B)
+    for i in xrange(A.shape[1]):
+        s = sum(A[:,i])
+        Z[:, i] = Z[:,i]*s
+    return sqrt(sum((A - Z) ** 2))
 
+def frobenius_old(A, B):
+   return sqrt(sum((A - B) ** 2))
 
 def rmse(A, B):
     return sqrt(mean((A - B) ** 2))
@@ -40,7 +48,10 @@ def kl_name():
 
 
 def hellinger(A, B):
-    return sum((sqrt(A) - sqrt(B)) ** 2) / 2
+    res = 0.
+    for i in xrange(A.shape[1]):
+        res += sqrt(sum((sqrt(A[:,i]) - sqrt(B[:,i])) ** 2) / 2)
+    return res / A.shape[1]
 
 
 def hellinger_name():

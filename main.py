@@ -7,7 +7,7 @@ import config
 import generators
 import methods
 import measure
-from common import cost, normalize_cols, hellinger, print_head, get_permute
+from common import cost, hellinger, normalize_cols, print_head, get_permute
 import visualize
 import data
 import prepare
@@ -56,7 +56,8 @@ def gen_real(cfg=config.default_config()):
     Theta_r = gen_theta(cfg)
 
     F = np.dot(Phi_r, Theta_r)
-
+    for i in xrange(F.shape[1]):
+        F[:, i] = F[:,i] * np.random.randint(100,8000)
     return (F, Phi_r, Theta_r)
 
 
@@ -120,15 +121,15 @@ def run(F, Phi, Theta, Phi_r=None, Theta_r=None, cfg=config.default_config()):
     if cfg['compare_real']:
         #m = Munkres()
         idx = get_permute(Phi_r, Theta_r, Phi, Theta, cfg['munkres'])
-        hdist[0][0] = hellinger(Phi[:, idx[:, 1]], Phi_r[:, idx[:, 0]]) / T
-        hdist[1][0] = hellinger(Theta[idx[:, 1],:], Theta_r[idx[:, 0],:]) / T
+        hdist[0][0] = hellinger(Phi[:, idx[:, 1]], Phi_r[:, idx[:, 0]])
+        hdist[1][0] = hellinger(Theta[idx[:, 1],:], Theta_r[idx[:, 0],:])
 
     if cfg['print_lvl'] > 1:
         print('Initial loss:', val[0])
     status = 0
     methods_num = len(schedule)
     it = -1
-    for it in range(cfg['max_iter']):
+    for it in range(cfg['max_iter']+1):
         if cfg['print_lvl'] > 1:
             print('Iteration', it+1)
         Phi_old = deepcopy(Phi)
@@ -168,14 +169,14 @@ def run(F, Phi, Theta, Phi_r=None, Theta_r=None, cfg=config.default_config()):
         print('Final:')
     Phi = normalize_cols(Phi)
     Theta = normalize_cols(Theta)
-    for j, fun_name in enumerate(meas):
-        fun = getattr(measure, fun_name)
-        val[it+2:, j] = fun(F, np.dot(Phi, Theta))#fun(F_norm, np.dot(Phi, Theta))
+    #for j, fun_name in enumerate(meas):
+    #    fun = getattr(measure, fun_name)
+    #    val[it+2:, j] = fun(F, np.dot(Phi, Theta))#fun(F_norm, np.dot(Phi, Theta))
     
-    if cfg['compare_real']:
-        idx = get_permute(Phi_r, Theta_r, Phi, Theta, cfg['munkres'])
-        hdist[0][it+2:] = hellinger(Phi[:, idx[:, 1]], Phi_r[:, idx[:, 0]])
-        hdist[1][it+2:] = hellinger(Theta[idx[:, 1],:], Theta_r[idx[:, 0], :])
+    #if cfg['compare_real']:
+    #    idx = get_permute(Phi_r, Theta_r, Phi, Theta, cfg['munkres'])
+    #    hdist[0][it+2:] = hellinger(Phi[:, idx[:, 1]], Phi_r[:, idx[:, 0]])
+    #    hdist[1][it+2:] = hellinger(Theta[idx[:, 1],:], Theta_r[idx[:, 0], :])
 
     return (val, hdist, it, Phi, Theta, status)
 
@@ -215,7 +216,7 @@ def load_dataset(cfg=config.default_config()):
         F, vocab = data.load_uci(cfg['data_name'], cfg)
         N, M = F.shape
         cfg['N'], cfg['M'] = F.shape
-        Phi_r, Theta_r = load_obj(cfg['matrices_names'].split(' ')[0]), load_obj(cfg['matrices_names'].split(' ')[1])
+        Phi_r, Theta_r = load_obj('Phi_'+cfg['data_name']), load_obj('Theta_'+cfg['data_name'])
         F_merged = merge_halfmodel(F, Phi_r, Theta_r, cfg)
         print('Dimensions of F:', N, M)
         print('Checking assumption on F:', np.sum(F_merged, axis=0).max())
@@ -226,6 +227,12 @@ def load_dataset(cfg=config.default_config()):
         Phi_r = np.eye(cfg['T'])
         Theta_r = np.eye(cfg['T'])
         return F, None, cfg['T'], cfg['T'], Phi_r, Theta_r
+    elif cfg['load_data'] == 5:
+        cfg['theta_sparsity'] = 1.
+        cfg['phi_sparsity'] = 1.
+        F, Phi_r, Theta_r = gen_real(cfg)
+        print('Checking assumption on F:', np.sum(F, axis=0).max())
+        return F, None, F.shape[0], F.shape[1], Phi_r, Theta_r
 
 def construct_from_svd(U, s, V, cfg):
     T = cfg['T']
@@ -273,9 +280,14 @@ def initialize_matrices(i, F, cfg=config.default_config()):
         Theta = normalize_cols(Theta)
         return Phi, Theta
     elif (int(cfg['prepare_method'].split(',')[i]) == 2):
-        print("Random")
+        print("Random rare")
         return gen_init(cfg)
     elif (int(cfg['prepare_method'].split(',')[i]) == 3):
+        print("Random uniform")
+        cfg['real_phi_sparsity'] = 1.
+        cfg['real_theta_sparsity'] = 1.
+        return gen_init(cfg)
+    elif (int(cfg['prepare_method'].split(',')[i]) == 4):
         eps = cfg['eps']
         F_norm = normalize_cols(F)
         print("Clustering of words")
@@ -288,14 +300,14 @@ def initialize_matrices(i, F, cfg=config.default_config()):
         Phi[Phi < eps] = 0
         Phi = normalize_cols(Phi)
         return Phi, Theta
-    elif (int(cfg['prepare_method'].split(',')[i]) == 4):
+    elif (int(cfg['prepare_method'].split(',')[i]) == 5):
         eps = cfg['eps']
         F_norm = normalize_cols(F)
         print("SVD init")
         U, s, V = np.linalg.svd(F_norm)
         Phi, Theta = construct_from_svd(U, s, V, cfg)
         return Phi, Theta
-    elif (int(cfg['prepare_method'].split(',')[i]) == 5):
+    elif (int(cfg['prepare_method'].split(',')[i]) == 6):
         eps = cfg['eps']
         transformer = TfidfTransformer()
         transformer.fit(F)
@@ -320,11 +332,11 @@ def calculate_stats(series, begin_iter):
     series_max = series[np.argmax(series[:,-1]),:]
     return series_mean, np.sqrt(series_var), series_min, series_max
 
-def save_obj(obj, name ):
+def save_obj(obj, name):
     with open('./'+ name + '.pkl', 'wb') as f:
         pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
 
-def load_obj(name ):
+def load_obj(name):
     with open('./' + name + '.pkl', 'rb') as f:
         return pickle.load(f)
 
@@ -377,9 +389,10 @@ def main(config_file='config.txt', results_file='results.txt', cfg=None):
     total_runs = sum([int(x) for x in cfg['runs'].split(",")])
     results = [0] * total_runs #res==results, different quality measures arrays
     finals = [[] for i in cfg['finals'].split(',')] # pmi, mean pmi etc
+    prep_time = [0] * total_runs
     hdist_runs = [0] * total_runs #hellinger distances arrays
     exp_time = [0] * total_runs #time for run EM-algo
-
+    general_info = []
     #measures to implement
     meas = cfg['measure'].split(',')
     meas_name = [''] * len(meas)
@@ -396,6 +409,8 @@ def main(config_file='config.txt', results_file='results.txt', cfg=None):
 
     #initialization
     current_exp = 0
+    new_index = 0
+    #general_info = load_obj(cfg['result_dir']+"general_info")
     for it, expirement_runs in enumerate([int(x) for x in cfg['runs'].split(",")]):
         for r in range(expirement_runs):
             if cfg['print_lvl'] > 0:
@@ -409,7 +424,7 @@ def main(config_file='config.txt', results_file='results.txt', cfg=None):
             Phi, Theta = initialize_matrices(it, F, cfg)
             end_time = time() - start_time
             print('Preparing took time:', timedelta(seconds=end_time))
-
+            prep_time[current_exp] = end_time
             #choose one method for compare (plsa)
             if cfg['compare_methods'] > 0:
                 cfg['schedule'] = methods[0]
@@ -417,6 +432,8 @@ def main(config_file='config.txt', results_file='results.txt', cfg=None):
             #calculate usual EM-alg
             start = time()
             (val, hdist, i, Phi, Theta, status) = run(F, Phi, Theta, Phi_r, Theta_r, cfg)
+            new_index +=1
+            general_info.append((val, hdist, i, Phi, Theta, status))
             stop = time()
             print('Run time:', timedelta(seconds=stop - start))
 
@@ -428,14 +445,14 @@ def main(config_file='config.txt', results_file='results.txt', cfg=None):
                 print('  Result:', val[-1, :])
             for i, fun_name in enumerate(cfg['finals'].split(',')):
                 fun = getattr(measure, fun_name)
-                name, val = fun(Phi, Theta)
+                name, val = fun(F, Phi, Theta)
                 finals[i].append(val)
                 print(name, ':', val)
 
             #save results for different runs
             if int(cfg['save_matrices'].split(",")[it]) == 1 and r == 0:
-            	save_obj(Phi, 'Phi')
-            	save_obj(Theta, 'Theta')
+            	save_obj(Phi, 'Phi_'+cfg['data_name'])
+            	save_obj(Theta, 'Theta_'+cfg['data_name'])
 
             if cfg['save_topics']:
                 visualize.save_topics(Phi, os.path.join(cfg['result_dir'], cfg['experiment'] + '_'+str(current_exp)+'topics.txt'), vocab)
@@ -450,38 +467,77 @@ def main(config_file='config.txt', results_file='results.txt', cfg=None):
     else:
         exp_name = cfg['experiment']
 
+    #save mean times
+    index_exp_series = 0
+    with open(os.path.join(cfg['result_dir'], cfg['experiment']+'_times.txt'),"w") as f:
+        for it, expirement_runs in enumerate([int(x) for x in cfg['runs'].split(",")]):
+            cur_mean_exp_time = np.median(exp_time[index_exp_series:index_exp_series+expirement_runs])
+            cur_mean_prep_time = np.median(prep_time[index_exp_series:index_exp_series+expirement_runs])
+            f.write("Prep time: ")
+            f.write(str(cur_mean_prep_time))
+            f.write('\n')
+            f.write("Exp time: ")
+            f.write(str(cur_mean_exp_time))
+            f.write('\n')
+            f.write('\n')
+            index_exp_series += expirement_runs
+
     if cfg['compare_real']:
+        labels = ["Arora", "Random-rare", "Random-uniform", "Clust-words", "SVD", "Clust-tfIdf"]
         index_exp_series = 0
         plt.figure()
+        plt.title("Phi", fontsize=18)
+        plt.ylabel(u"Расстояние Хеллингера", fontsize=18)
+        plt.xlabel(u"Номер итерации", fontsize=18)
+        #plt.grid(True)
         colors = ['r', 'b', 'g', 'm', 'c', 'y', 'k']
         for it, expirement_runs in enumerate([int(x) for x in cfg['runs'].split(",")]):
             #Phi
             series_stats = calculate_stats(hdist_runs[index_exp_series:index_exp_series+expirement_runs, 0, 0:], cfg['begin_graph_iter'])
-            plt.plot(series_stats[0], linewidth=2, c=colors[it % len(colors)], label = str(it+1)+" Phi")
-            plt.fill_between(range(len(series_stats[0])), series_stats[0] + series_stats[1], series_stats[0] - series_stats[1], alpha = 0.1, facecolor=colors[it % len(colors)])
+            plt.plot(range(cfg['begin_graph_iter'], cfg['begin_graph_iter'] + len(series_stats[0])), series_stats[0], linewidth=2, c=colors[it % len(colors)], label = labels[it])
+            plt.fill_between(range(cfg['begin_graph_iter'], cfg['begin_graph_iter'] + len(series_stats[0])), series_stats[2], series_stats[3], alpha = 0.1, facecolor=colors[it % len(colors)])
+            '''plt.fill_between(range(len(series_stats[0])), series_stats[0] + series_stats[1], series_stats[0] - series_stats[1], alpha = 0.1, facecolor=colors[it % len(colors)])
             plt.plot(series_stats[2], linewidth=0.5, c=colors[it % len(colors)])
-            plt.plot(series_stats[3], linewidth=0.5, c=colors[it % len(colors)])
+            plt.plot(series_stats[3], linewidth=0.5, c=colors[it % len(colors)])'''
             index_exp_series += expirement_runs
 
         plt.legend()
         plt.draw()
         filename = os.path.join(cfg['result_dir'], cfg['experiment']+'_Phi'+'.pdf')
         plt.savefig(filename, format='pdf')
+        plt.ylabel("Hellinger distance", fontsize=18)
+        plt.xlabel("Iteration", fontsize=18)
+        plt.legend()
+        plt.draw()
+        filename = os.path.join(cfg['result_dir'], cfg['experiment']+'_Phi_eng'+'.pdf')
+        plt.savefig(filename, format='pdf')
 
         plt.figure()
+        plt.title("Theta", fontsize=18)
+        plt.ylabel(u"Расстояние Хеллингера", fontsize=18)
+        plt.xlabel(u"Номер итерации", fontsize=18)
+        #plt.grid(True)
         index_exp_series = 0
+
         for it, expirement_runs in enumerate([int(x) for x in cfg['runs'].split(",")]):
             #Theta
             series_stats = calculate_stats(hdist_runs[index_exp_series:index_exp_series+expirement_runs, 1, 0:], cfg['begin_graph_iter'])
-            plt.plot(series_stats[0], linewidth=2, c=colors[it % len(colors)], label = str(it+1)+" Theta")
-            plt.fill_between(range(len(series_stats[0])), series_stats[0] + series_stats[1], series_stats[0] - series_stats[1], alpha = 0.1, facecolor=colors[it % len(colors)])
+            plt.plot(range(cfg['begin_graph_iter'], cfg['begin_graph_iter'] + len(series_stats[0])), series_stats[0], linewidth=2, c=colors[it % len(colors)], label = labels[it])
+            plt.fill_between(range(cfg['begin_graph_iter'], cfg['begin_graph_iter'] + len(series_stats[0])), series_stats[2], series_stats[3], alpha = 0.1, facecolor=colors[it % len(colors)])
+            '''plt.fill_between(range(len(series_stats[0])), series_stats[0] + series_stats[1], series_stats[0] - series_stats[1], alpha = 0.1, facecolor=colors[it % len(colors)])
             plt.plot(series_stats[2], linewidth=0.5, c=colors[it % len(colors)])
-            plt.plot(series_stats[3], linewidth=0.5, c=colors[it % len(colors)])
+            plt.plot(series_stats[3], linewidth=0.5, c=colors[it % len(colors)])'''
             index_exp_series += expirement_runs
 
         plt.legend()
         plt.draw()
         filename = os.path.join(cfg['result_dir'], cfg['experiment']+'_Theta'+'.pdf')
+        plt.savefig(filename, format='pdf')
+        plt.ylabel("Hellinger distance", fontsize=18)
+        plt.xlabel("Iteration", fontsize=18)
+        plt.legend()
+        plt.draw()
+        filename = os.path.join(cfg['result_dir'], cfg['experiment']+'_Theta_eng'+'.pdf')
         plt.savefig(filename, format='pdf')
     #TODO:check
     '''if cfg['show_results']:
@@ -498,11 +554,8 @@ def main(config_file='config.txt', results_file='results.txt', cfg=None):
         if cfg['compare_real']:
             print('Hellinger res:', hdist_runs[0][-1,0])
             visualize.plot_measure(np.array([r[:, 0] for r in hdist_runs]).T, measure.hellinger_name())'''
-
+    save_obj(general_info, cfg['result_dir']+"general_info")
     return results, finals
-
-if __name__ != '__main__':
-    main()
     #plt.show()
 
 if __name__ == '__main__':
@@ -514,15 +567,18 @@ if __name__ == '__main__':
 
     print("Calculations:")
     results, finals = main(cfg=cfg)
+    #save_obj(results, cfg['result_dir']+"res")
+    #save_obj(finals, cfg['result_dir']+"fin")
 
     print("Plot graphs")
     colors = ['r', 'b', 'g', 'm', 'c', 'y', 'k']
     markers = ['o', '^', 'd', (5,1)]
+    labels = ["Arora", "Random-rare", "Random-uniform", "Clust-words", "SVD", "Clust-tfIdf"]
 
     with open(os.path.join(cfg['result_dir'], cfg['experiment']+'_finals.txt'),"w") as f:
         for i, fun_name in enumerate(cfg['finals'].split(',')):
             fun = getattr(measure, fun_name)
-            name, val = fun(np.array([[1]]), np.array([[1]]))
+            name, val = fun(np.array([[1]]), np.array([[1]]), np.array([[1]]))
             index_exp_series = 0
             for it, expirement_runs in enumerate([int(x) for x in cfg['runs'].split(",")]):
                 series_mean = np.mean(finals[i][index_exp_series:index_exp_series+expirement_runs])
@@ -539,14 +595,17 @@ if __name__ == '__main__':
         val = np.array([r[:, i] for r in results])
         fun = getattr(measure, fun_name + '_name')
         plt.ylabel(fun(), fontsize=13)
-
+        plt.title("F", fontsize=13)
+        plt.xlabel(u"Номер итерации", fontsize=13)
+        #plt.grid(True)
         index_exp_series = 0
         for it, expirement_runs in enumerate([int(x) for x in cfg['runs'].split(",")]):
             series_stats = calculate_stats(val[index_exp_series:index_exp_series+expirement_runs, 0:], cfg['begin_graph_iter'])
-            plt.plot(series_stats[0], linewidth=2, c=colors[it % len(colors)], label = str(it+1))
-            plt.fill_between(range(len(series_stats[0])), series_stats[0] + series_stats[1], series_stats[0] - series_stats[1], alpha = 0.1, facecolor=colors[it % len(colors)])
+            plt.plot(range(cfg['begin_graph_iter'], cfg['begin_graph_iter'] + len(series_stats[0])), series_stats[0], linewidth=2, c=colors[it % len(colors)], label = labels[it])
+            plt.fill_between(range(cfg['begin_graph_iter'], cfg['begin_graph_iter'] + len(series_stats[0])), series_stats[2], series_stats[3], alpha = 0.1, facecolor=colors[it % len(colors)])
+            '''plt.fill_between(range(len(series_stats[0])), series_stats[0] + series_stats[1], series_stats[0] - series_stats[1], alpha = 0.1, facecolor=colors[it % len(colors)])
             plt.plot(series_stats[2], linewidth=0.5, c=colors[it % len(colors)])
-            plt.plot(series_stats[3], linewidth=0.5, c=colors[it % len(colors)])
+            plt.plot(series_stats[3], linewidth=0.5, c=colors[it % len(colors)])'''
             index_exp_series += expirement_runs
 
         plt.legend()
@@ -554,4 +613,45 @@ if __name__ == '__main__':
 
         filename = os.path.join(cfg['result_dir'], cfg['experiment']+'_'+fun_name+'.pdf')
         plt.savefig(filename, format='pdf')
+        fun = getattr(measure, fun_name + '_name_eng')
+        plt.ylabel(fun(), fontsize=13)
+        plt.title("F", fontsize=13)
+        plt.xlabel("Iteration", fontsize=13)
+        plt.legend()
+        plt.draw()
+
+        filename = os.path.join(cfg['result_dir'], cfg['experiment']+'_'+fun_name+'_eng.pdf')
+        plt.savefig(filename, format='pdf')
+        if fun_name == "perplexity" or fun_name == "frobenius":
+            plt.figure()
+            val = np.array([r[:, i] for r in results])
+            fun = getattr(measure, fun_name + '_name')
+            plt.ylabel(fun(), fontsize=18)
+            plt.title("F", fontsize=18)
+            plt.xlabel(u"Номер итерации", fontsize=18)
+            #plt.grid(True)
+            index_exp_series = 0
+            for it, expirement_runs in enumerate([int(x) for x in cfg['runs'].split(",")]):
+                series_stats = calculate_stats(val[index_exp_series:index_exp_series+expirement_runs, 0:], 1)
+                plt.plot(range(1, 1 + len(series_stats[0])), series_stats[0], linewidth=2, c=colors[it % len(colors)], label = labels[it])
+                plt.fill_between(range(1, 1 + len(series_stats[0])), series_stats[2], series_stats[3], alpha = 0.1, facecolor=colors[it % len(colors)])
+                '''plt.fill_between(range(len(series_stats[0])), series_stats[0] + series_stats[1], series_stats[0] - series_stats[1], alpha = 0.1, facecolor=colors[it % len(colors)])
+                plt.plot(series_stats[2], linewidth=0.5, c=colors[it % len(colors)])
+                plt.plot(series_stats[3], linewidth=0.5, c=colors[it % len(colors)])'''
+                index_exp_series += expirement_runs
+
+            plt.legend()
+            plt.draw()
+
+            filename = os.path.join(cfg['result_dir'], cfg['experiment']+'_'+fun_name+'_addit.pdf')
+            plt.savefig(filename, format='pdf')
+            fun = getattr(measure, fun_name + '_name_eng')
+            plt.ylabel(fun(), fontsize=18)
+            plt.title("F", fontsize=18)
+            plt.xlabel("Iteration", fontsize=18)
+            plt.legend()
+            plt.draw()
+
+            filename = os.path.join(cfg['result_dir'], cfg['experiment']+'_'+fun_name+'_eng_addit.pdf')
+            plt.savefig(filename, format='pdf')
     #plt.show()

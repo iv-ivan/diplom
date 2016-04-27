@@ -4,7 +4,8 @@
 import config
 
 from numpy import *
-
+def normalize_cols(matrix):
+    return matrix / maximum(sum(matrix, 0), 1e-7)
 # metrics
 
 def perplexity_old(A, B):
@@ -16,6 +17,8 @@ def perplexity(A, B):
 def perplexity_name():
     return u'Перплексия'
 
+def perplexity_name_eng():
+    return 'Perplexity'
 
 def frobenius(A, B):
     Z = copy(B)
@@ -38,6 +41,8 @@ def rmse_name():
 def frobenius_name():
     return u'Норма Фробениуса'
 
+def frobenius_name_eng():
+    return 'Frobenius norm'
 
 def kl(A, B):
     return sum(A * log(maximum(A / maximum(B, 1e-7), 1e-7)) - A + B)
@@ -48,20 +53,23 @@ def kl_name():
 
 
 def hellinger(A, B):
+    A_scaled = normalize_cols(A)
     res = 0.
     for i in xrange(A.shape[1]):
-        res += sqrt(sum((sqrt(A[:,i]) - sqrt(B[:,i])) ** 2) / 2)
+        res += sqrt(sum((sqrt(A_scaled[:,i]) - sqrt(B[:,i])) ** 2) / 2)
     return res / A.shape[1]
 
 
 def hellinger_name():
     return u'Расстояние Хеллингера'
 
+def hellinger_name_eng():
+    return 'Hellinger distance'
 # final measures of factorization
 
 # common
 
-def pmi(W, H, top_words=10):
+def old_pmi(W, H, top_words=10):
     N, T = W.shape
     M = H.shape[1]
     pt = mean(H, axis=1)
@@ -74,6 +82,19 @@ def pmi(W, H, top_words=10):
             pmi_res[topic, wi, :] = log(maximum(sum(Wp, axis=1) / (pw[twords] * pw[word]), 1e-7))
     return pmi_res
 
+def pmi(F, W, H, top_words=10):
+    N, T = W.shape
+    M = H.shape[1]
+    n_d = sum(F, axis=0)
+    N = sum(F)
+    pmi_res = zeros((T, top_words, top_words), dtype='float64')
+    P = sum(F, axis = 1) / N
+    for topic in xrange(T):
+        twords = argsort(-W[:, topic])[:top_words]
+        for wi, word in enumerate(twords):
+            Wp = F[twords, :] * tile(F[word, :], (top_words, 1)) / (n_d*N)
+            pmi_res[topic, wi, :] = log(maximum(sum(Wp, axis=1) / (P[twords] * P[word]), 1e-7))
+    return pmi_res
 
 def get_closest(W):
     T = W.shape[1]
@@ -98,9 +119,9 @@ def cl_cov(W):
 
 # special
 
-def mean_pmi(W, H):
+def mean_pmi(F, W, H):
     N, T = W.shape
-    P = pmi(W, H)
+    P = pmi(F, W, H)
     #for topic in xrange(T):
     #    res += mean(P[topic, :, :])
     return ('Mean PMI', mean(P))
@@ -172,7 +193,7 @@ def mean_hell(W, H):
     return 'Mean Hell', mean(dis)
 
 
-def mean_nhell(W, H):
+def mean_nhell(F, W, H):
     _, dis = get_closest(W)
     return 'Mean NHell', mean(dis)
 

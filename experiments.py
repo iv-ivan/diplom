@@ -26,6 +26,10 @@ from shutil import copyfile
 import main
 from main import calculate_stats
 
+def load_obj(name):
+    with open('./' + name + '.pkl', 'rb') as f:
+        return pickle.load(f)
+
 '''def experiment_old():
     cfg = config.load('config.txt')
     doubles = ['als', 'mult'];
@@ -177,45 +181,109 @@ def plot_last_points(res_all, cfg):
     colors = ['r', 'b', 'g', 'm', 'c', 'y', 'k']
     markers = ['o', '^', 'd', (5,1)]
     labels = ["Arora", "Random-rare", "Random-uniform", "Clust-words", "SVD", "Clust-tfIdf"]
+    alpha_list = [0.0,0.2,0.4,0.6,0.8,1.0]
     for i, fun_name in enumerate(cfg['measure'].split(',')):
-        points_med = [[] for i in xrange(6)]
-        points_max = [[] for i in xrange(6)]
-        points_min = [[] for i in xrange(6)]
-        for results in res_all:
-            plt.figure()
-            val = np.array([r[:, i] for r in results])
-            fun = getattr(measure, fun_name + '_name')
-            plt.ylabel(fun(), fontsize=18)
-            plt.title("F", fontsize=18)
-            plt.xlabel(u"alpha", fontsize=18)
+        print("!",i)
+        plt.figure()
+        fun = getattr(measure, fun_name + '_name')
+        plt.ylabel(fun(), fontsize=18)
+        plt.title("F", fontsize=18)
+        plt.xlabel(u"alpha", fontsize=18)
+        #val = np.array([r[:, i] for r in results[0]])
             #plt.grid(True)
+        points_med = [[0 for iii in xrange(len(alpha_list))] for j in xrange(len(labels))]
+        points_max = [[0 for iii in xrange(len(alpha_list))] for j in xrange(len(labels))]
+        points_min = [[0 for iii in xrange(len(alpha_list))] for j in xrange(len(labels))]
+        for j, alpha in enumerate(alpha_list):
             index_exp_series = 0
             for it, expirement_runs in enumerate([int(x) for x in cfg['runs'].split(",")]):
-                series_stats = calculate_stats(val[index_exp_series:index_exp_series+expirement_runs, 0:], cfg['begin_graph_iter'])
-                points_med[it].append(series_stats[0][-1])
-                points_max[it].append(series_stats[2][-1])
-                points_min[it].append(series_stats[3][-1])
+                #print(i,j,it,expirement_runs, len(res_all[j]))
+                #print (len(res_all[j][index_exp_series][0][-1]))
+                zzz = [res_all[j][index_exp_series+jj][0][-1][i] for jj in xrange(expirement_runs)]
+                #print (zzz)
+                #series_stats = calculate_stats(zzz, cfg['begin_graph_iter'])
+                points_med[it][j]=np.mean(zzz)#series_stats[0][-1])
+                points_max[it][j]=np.max(zzz)#series_stats[2][-1])
+                points_min[it][j]=np.min(zzz)#series_stats[3][-1])
                 #plt.plot(range(cfg['begin_graph_iter'], cfg['begin_graph_iter'] + len(series_stats[0])), series_stats[0], linewidth=2, c=colors[it % len(colors)], label = labels[it])
                 #plt.fill_between(range(cfg['begin_graph_iter'], cfg['begin_graph_iter'] + len(series_stats[0])), series_stats[2], series_stats[3], alpha = 0.1, facecolor=colors[it % len(colors)])
                 index_exp_series += expirement_runs
-        for ii in xrange(6):
-            plt.plot([0.0,0.2,0.4,0.6,0.8,1.0], points_med[ii], linewidth=2, c=colors[ii % len(colors)], label = labels[ii])
-            plt.fill_between([0.0,0.2,0.4,0.6,0.8,1.0], points_max[ii], points_min[ii], alpha = 0.1, facecolor=colors[ii % len(colors)])
-        plt.legend()
+        for ii in xrange(len(labels)):
+            plt.plot(alpha_list, points_med[ii], linewidth=2, c=colors[ii % len(colors)], label = labels[ii])
+            plt.fill_between(alpha_list, points_max[ii], points_min[ii], alpha = 0.1, facecolor=colors[ii % len(colors)])
+        plt.legend(loc=2+i,prop={'size':8})
         plt.draw()
 
-        filename = os.path.join(cfg['result_dir'], cfg['experiment']+'_'+fun_name+'.pdf')
+        filename = os.path.join(cfg['result_dir'], cfg['experiment']+'_'+fun_name+'blabla.pdf')
         plt.savefig(filename, format='pdf')
         fun = getattr(measure, fun_name + '_name_eng')
         plt.ylabel(fun(), fontsize=18)
         plt.title("F", fontsize=18)
-        plt.xlabel("Iteration", fontsize=18)
-        plt.legend()
+        plt.xlabel("alpha", fontsize=18)
+        plt.legend(loc=2+i,prop={'size':8})
         plt.draw()
 
-        filename = os.path.join(cfg['result_dir'], cfg['experiment']+'_'+fun_name+'_eng.pdf')
+        filename = os.path.join(cfg['result_dir'], cfg['experiment']+'_'+fun_name+'_eng_blabla.pdf')
         plt.savefig(filename, format='pdf')
 
+def plot_hellinger(res_all, cfg):
+    colors = ['r', 'b', 'g', 'm', 'c', 'y', 'k']
+    markers = ['o', '^', 'd', (5,1)]
+    labels = ["Arora", "Random-rare", "Random-uniform", "Clust-words", "SVD", "Clust-tfIdf"]
+    alpha_list = [0.0,0.2,0.4,0.6,0.8,1.0]
+
+    for i in xrange(2):
+        plt.figure()
+        if i == 0:
+            plt.title("Phi", fontsize=18)
+        else:
+            plt.title("Theta", fontsize=18)
+        plt.ylabel(u'Расстояние Хеллингера', fontsize=18)
+        plt.xlabel(u"alpha", fontsize=18)
+        #val = np.array([r[:, i] for r in results[0]])
+            #plt.grid(True)
+        points_med = [[0 for iii in xrange(len(alpha_list))] for j in xrange(len(labels))]
+        points_max = [[0 for iii in xrange(len(alpha_list))] for j in xrange(len(labels))]
+        points_min = [[0 for iii in xrange(len(alpha_list))] for j in xrange(len(labels))]
+        for j, alpha in enumerate(alpha_list):
+            index_exp_series = 0
+            for it, expirement_runs in enumerate([int(x) for x in cfg['runs'].split(",")]):
+                #print(i,j,it,expirement_runs, len(res_all[j]))
+                #print (len(res_all[j][index_exp_series][0][-1]))
+                zzz = [res_all[j][index_exp_series+jj][1][i][-1] for jj in xrange(expirement_runs)]
+                #print (zzz)
+                #series_stats = calculate_stats(zzz, cfg['begin_graph_iter'])
+                points_med[it][j]=np.mean(zzz)#series_stats[0][-1])
+                points_max[it][j]=np.max(zzz)#series_stats[2][-1])
+                points_min[it][j]=np.min(zzz)#series_stats[3][-1])
+                #plt.plot(range(cfg['begin_graph_iter'], cfg['begin_graph_iter'] + len(series_stats[0])), series_stats[0], linewidth=2, c=colors[it % len(colors)], label = labels[it])
+                #plt.fill_between(range(cfg['begin_graph_iter'], cfg['begin_graph_iter'] + len(series_stats[0])), series_stats[2], series_stats[3], alpha = 0.1, facecolor=colors[it % len(colors)])
+                index_exp_series += expirement_runs
+        for ii in xrange(len(labels)):
+            plt.plot(alpha_list, points_med[ii], linewidth=2, c=colors[ii % len(colors)], label = labels[ii])
+            plt.fill_between(alpha_list, points_max[ii], points_min[ii], alpha = 0.1, facecolor=colors[ii % len(colors)])
+        plt.legend(loc=4,prop={'size':8})
+        plt.draw()
+
+        if i == 0:
+            filename = os.path.join(cfg['result_dir'], cfg['experiment']+'_blabla_Phi.pdf')
+        else:
+            filename = os.path.join(cfg['result_dir'], cfg['experiment']+'_blabla_Theta.pdf')
+        plt.savefig(filename, format='pdf')
+
+        if i == 0:
+            plt.title("Phi", fontsize=18)
+        else:
+            plt.title("Theta", fontsize=18)
+        plt.ylabel('Hellinger distance', fontsize=18)
+        plt.xlabel("alpha", fontsize=18)
+        plt.legend(loc=4,prop={'size':8})
+        plt.draw()
+        if i == 0:
+            filename = os.path.join(cfg['result_dir'], cfg['experiment']+'_eng_blabla_Phi.pdf')
+        else:
+            filename = os.path.join(cfg['result_dir'], cfg['experiment']+'_eng_blabla_Theta.pdf')
+        plt.savefig(filename, format='pdf')
 
 def ivan_experiment():
     for T in [70,100]:
@@ -223,6 +291,8 @@ def ivan_experiment():
         result_dir = ['test/024_04_16_random_'+str(T)+'_/', 'test/024_04_16_random_uniform'+str(T)+'_/', 'test/024_04_16_diag_'+str(T)+'_/','test/024_04_16_nips_'+str(T)+'_/','test/024_04_16_kos_'+str(T)+'_/','test/024_04_16_nips_halfsint_'+str(T)+'_','test/024_04_16_kos_halfsint_'+str(T)+'_']
         data_name = ['','','','nips','kos','nips','kos']
         for i, l in enumerate(load_data):
+            if i < 5:
+                continue
             cfg = config.load('config.txt')
             cfg['T'] = T
             cfg['load_data'] = l
@@ -248,19 +318,81 @@ def ivan_experiment():
             else:
                 last_points_results = []
                 last_points_finals = []
-                for alpha in [0.0,0.2,0.4,0.6,0.8,1.0]:
+                alpha_list = [0.0,0.2,0.4,0.6,0.8,1.0]
+                if i == 5:
+                    begin = 20 
+                else:
+                    begin = 2
+                for alpha in alpha_list[begin:]:
                     cfg['result_dir'] = result_dir[i]+str(alpha)+"/"
                     if not os.path.exists(cfg['result_dir']):
                         os.makedirs(cfg['result_dir'])
                     cfg['alpha'] = alpha
                     results, finals = main.main(cfg=cfg)
                     plot_results(results, finals, cfg)
-                    last_points_results.append(results)
-                cfg['result_dir'] = result_dir[i]
-                if not os.path.exists(cfg['result_dir']):
-                    os.makedirs(cfg['result_dir'])
-                plot_last_points(last_points_results, cfg)
+                    #last_points_results.append(results)
+                #cfg['result_dir'] = result_dir[i]
+                #if not os.path.exists(cfg['result_dir']):
+                    #os.makedirs(cfg['result_dir'])
+                #plot_last_points(last_points_results, cfg)
 
+def halfsint_graph():
+    result_dir = 'test/024_04_16_kos_halfsint_100_'#,'test/024_04_16_kos_halfsint_'+str(T)+'_']
+    cfg = config.load('config.txt')
+    res_all = []
+    alpha_list = [0.0,0.2,0.4,0.6,0.8,1.0]
+    for alpha in alpha_list:
+        cfg['result_dir'] = result_dir+str(alpha)+"/"
+        general_info = load_obj(cfg['result_dir']+"general_info")
+        res_all.append(general_info)
+    plot_last_points(res_all, cfg)
+    plot_hellinger(res_all, cfg)
+
+def usual_graph():
+    colors = ['r', 'b', 'g', 'm', 'c', 'y', 'k']
+    markers = ['o', '^', 'd', (5,1)]
+    labels = ["Arora", "Random-rare", "Random-uniform", "Clust-words", "SVD", "Clust-tfIdf"]
+    result_dir = 'test/024_04_16_diag_70_/'
+    cfg = config.load(result_dir+'plsa_config.txt')
+    cfg['result_dir'] = result_dir
+    results = []
+    general_info = load_obj(cfg['result_dir']+"general_info")
+    for a in general_info:
+        results.append(a[0])
+    for i, fun_name in enumerate(cfg['measure'].split(',')):
+        if i == 1:
+            plt.figure()
+            val = np.array([r[:, i] for r in results])
+            fun = getattr(measure, fun_name + '_name')
+            plt.ylabel(fun(), fontsize=18)
+            plt.title("F", fontsize=18)
+            plt.xlabel(u"Номер итерации", fontsize=18)
+            #plt.grid(True)
+            index_exp_series = 0
+            for it, expirement_runs in enumerate([int(x) for x in cfg['runs'].split(",")]):
+                series_stats = calculate_stats(val[index_exp_series:index_exp_series+expirement_runs, 0:], cfg['begin_graph_iter'])
+                plt.plot(range(cfg['begin_graph_iter'], cfg['begin_graph_iter'] + len(series_stats[0])), series_stats[0], linewidth=2, c=colors[it % len(colors)], label = labels[it])
+                plt.fill_between(range(cfg['begin_graph_iter'], cfg['begin_graph_iter'] + len(series_stats[0])), series_stats[2], series_stats[3], alpha = 0.1, facecolor=colors[it % len(colors)])
+                index_exp_series += expirement_runs
+
+            x1,x2,y1,y2 = plt.axis()
+            plt.axis((x1,x2,0,3))
+            plt.legend()
+            plt.draw()
+
+            filename = os.path.join(cfg['result_dir'], cfg['experiment']+'_'+fun_name+'_addit.pdf')
+            plt.savefig(filename, format='pdf')
+            fun = getattr(measure, fun_name + '_name_eng')
+            plt.ylabel(fun(), fontsize=18)
+            plt.title("F", fontsize=18)
+            plt.xlabel("Iteration", fontsize=18)
+            x1,x2,y1,y2 = plt.axis()
+            plt.axis((x1,x2,0,3))
+            plt.legend()
+            plt.draw()
+
+            filename = os.path.join(cfg['result_dir'], cfg['experiment']+'_'+fun_name+'_eng_addit.pdf')
+            plt.savefig(filename, format='pdf')
 
 if __name__ == '__main__':
-    ivan_experiment()
+    usual_graph()

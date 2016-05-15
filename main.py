@@ -132,8 +132,8 @@ def run(F, Phi, Theta, Phi_r=None, Theta_r=None, cfg=config.default_config()):
     for it in range(cfg['max_iter']+1):
         if cfg['print_lvl'] > 1:
             print('Iteration', it+1)
-        Phi_old = deepcopy(Phi)
-        Theta_old = deepcopy(Theta)
+        ####Phi_old = deepcopy(Phi)
+        ####Theta_old = deepcopy(Theta)
         method_name = schedule[it % methods_num]
         if cfg['print_lvl'] > 1:
             print('Method:', method_name)
@@ -158,11 +158,11 @@ def run(F, Phi, Theta, Phi_r=None, Theta_r=None, cfg=config.default_config()):
                 print('By cost.')
             status = 1
             break
-        if abs(Phi_old - Phi).max() < eps and abs(Theta_old - Theta).max() < eps:
+        '''if abs(Phi_old - Phi).max() < eps and abs(Theta_old - Theta).max() < eps:
             if cfg['print_lvl'] > 1:
                 print('By argument.')
             status = 2
-            break
+            break'''
         #del W_old
         #del H_old
     if cfg['print_lvl'] > 1:
@@ -212,7 +212,7 @@ def load_dataset(cfg=config.default_config()):
         print('Checking assumption on F:', np.sum(F, axis=0).max())
         return F, None, F.shape[0], F.shape[1], Phi_r, Theta_r
     elif cfg['load_data'] == 3:
-    	print("uci halfmodel")
+    	print("uci halfmodel", cfg["alpha"])
         F, vocab = data.load_uci(cfg['data_name'], cfg)
         N, M = F.shape
         cfg['N'], cfg['M'] = F.shape
@@ -281,6 +281,8 @@ def initialize_matrices(i, F, cfg=config.default_config()):
         return Phi, Theta
     elif (int(cfg['prepare_method'].split(',')[i]) == 2):
         print("Random rare")
+        cfg['real_phi_sparsity'] = 0.05
+        cfg['real_theta_sparsity'] = 0.1
         return gen_init(cfg)
     elif (int(cfg['prepare_method'].split(',')[i]) == 3):
         print("Random uniform")
@@ -322,7 +324,23 @@ def initialize_matrices(i, F, cfg=config.default_config()):
         Phi[Phi < eps] = 0
         Phi = normalize_cols(Phi)
         return Phi, Theta
-
+    elif (int(cfg['prepare_method'].split(',')[i]) == 7):
+        eps = cfg['eps']
+        F_norm = normalize_cols(F)
+        print("Clustering of words")
+        centroids, labels = prepare.reduce_cluster(F_norm, cfg['T'], cfg)
+        Theta = centroids
+        Theta[Theta < eps] = 0
+        Theta = normalize_cols(Theta)
+        print('Solving for Phi')
+        Phi = np.transpose(np.linalg.solve(np.dot(Theta, Theta.T) + np.eye((Theta.T).shape[1]) * eps, np.dot(Theta, F_norm.T)))
+        Phi[Phi < eps] = 0
+        Phi = normalize_cols(Phi)
+        cfg['real_phi_sparsity'] = 1.
+        cfg['real_theta_sparsity'] = 1.
+        Phi1, Theta1 = gen_init(cfg)
+        zzz = 0.5
+        return normalize_cols(zzz*Phi1+(1.-zzz)*Phi),normalize_cols(zzz*Theta1+(1.-zzz)*Theta)
 
 def calculate_stats(series, begin_iter):
     series = series[:, begin_iter:]
@@ -484,6 +502,7 @@ def main(config_file='config.txt', results_file='results.txt', cfg=None):
 
     if cfg['compare_real']:
         labels = ["Arora", "Random-rare", "Random-uniform", "Clust-words", "SVD", "Clust-tfIdf"]
+        ####labels = ["Random-uniform", "Clust-words", "Mixed"]
         index_exp_series = 0
         plt.figure()
         plt.title("Phi", fontsize=18)
@@ -574,6 +593,7 @@ if __name__ == '__main__':
     colors = ['r', 'b', 'g', 'm', 'c', 'y', 'k']
     markers = ['o', '^', 'd', (5,1)]
     labels = ["Arora", "Random-rare", "Random-uniform", "Clust-words", "SVD", "Clust-tfIdf"]
+    ####labels = ["Random-uniform", "Clust-words", "Mixed"]
 
     with open(os.path.join(cfg['result_dir'], cfg['experiment']+'_finals.txt'),"w") as f:
         for i, fun_name in enumerate(cfg['finals'].split(',')):

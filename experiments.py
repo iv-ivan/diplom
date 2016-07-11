@@ -121,7 +121,7 @@ def plot_results(results, finals, cfg):
         index_exp_series = 0
         for it, expirement_runs in enumerate([int(x) for x in cfg['runs'].split(",")]):
             series_stats = calculate_stats(val[index_exp_series:index_exp_series+expirement_runs, 0:], cfg['begin_graph_iter'])
-            plt.plot(range(cfg['begin_graph_iter'], cfg['begin_graph_iter'] + len(series_stats[0])), series_stats[0], linewidth=2, c=colors[it % len(colors)], label = labels[it])
+            plt.plot(range(cfg['begin_graph_iter'], cfg['begin_graph_iter'] + len(series_stats[0])), series_stats[0], linewidth=2, c=colors[it % len(colors)], label = labels[int(cfg['prepare_method'].split(',')[it])])
             plt.fill_between(range(cfg['begin_graph_iter'], cfg['begin_graph_iter'] + len(series_stats[0])), series_stats[2], series_stats[3], alpha = 0.1, facecolor=colors[it % len(colors)])
             '''plt.fill_between(range(len(series_stats[0])), series_stats[0] + series_stats[1], series_stats[0] - series_stats[1], alpha = 0.1, facecolor=colors[it % len(colors)])
             plt.plot(series_stats[2], linewidth=0.5, c=colors[it % len(colors)])
@@ -153,7 +153,7 @@ def plot_results(results, finals, cfg):
             index_exp_series = 0
             for it, expirement_runs in enumerate([int(x) for x in cfg['runs'].split(",")]):
                 series_stats = calculate_stats(val[index_exp_series:index_exp_series+expirement_runs, 0:], 1)
-                plt.plot(range(1, 1 + len(series_stats[0])), series_stats[0], linewidth=2, c=colors[it % len(colors)], label = labels[it])
+                plt.plot(range(1, 1 + len(series_stats[0])), series_stats[0], linewidth=2, c=colors[it % len(colors)], label = labels[int(cfg['prepare_method'].split(',')[it])])
                 plt.fill_between(range(1, 1 + len(series_stats[0])), series_stats[2], series_stats[3], alpha = 0.1, facecolor=colors[it % len(colors)])
                 '''plt.fill_between(range(len(series_stats[0])), series_stats[0] + series_stats[1], series_stats[0] - series_stats[1], alpha = 0.1, facecolor=colors[it % len(colors)])
                 plt.plot(series_stats[2], linewidth=0.5, c=colors[it % len(colors)])
@@ -209,7 +209,7 @@ def plot_last_points(res_all, cfg):
                 #plt.fill_between(range(cfg['begin_graph_iter'], cfg['begin_graph_iter'] + len(series_stats[0])), series_stats[2], series_stats[3], alpha = 0.1, facecolor=colors[it % len(colors)])
                 index_exp_series += expirement_runs
         for ii in xrange(len(labels)):
-            plt.plot(alpha_list, points_med[ii], linewidth=2, c=colors[ii % len(colors)], label = labels[ii])
+            plt.plot(alpha_list, points_med[ii], linewidth=2, c=colors[ii % len(colors)], label = labels[int(cfg['prepare_method'].split(',')[ii])])
             plt.fill_between(alpha_list, points_max[ii], points_min[ii], alpha = 0.1, facecolor=colors[ii % len(colors)])
         plt.legend(loc=2+i,prop={'size':8})
         plt.draw()
@@ -260,7 +260,7 @@ def plot_hellinger(res_all, cfg):
                 #plt.fill_between(range(cfg['begin_graph_iter'], cfg['begin_graph_iter'] + len(series_stats[0])), series_stats[2], series_stats[3], alpha = 0.1, facecolor=colors[it % len(colors)])
                 index_exp_series += expirement_runs
         for ii in xrange(len(labels)):
-            plt.plot(alpha_list, points_med[ii], linewidth=2, c=colors[ii % len(colors)], label = labels[ii])
+            plt.plot(alpha_list, points_med[ii], linewidth=2, c=colors[ii % len(colors)], label = labels[int(cfg['prepare_method'].split(',')[ii])])
             plt.fill_between(alpha_list, points_max[ii], points_min[ii], alpha = 0.1, facecolor=colors[ii % len(colors)])
         plt.legend(loc=4,prop={'size':8})
         plt.draw()
@@ -349,10 +349,11 @@ def halfsint_graph():
     plot_hellinger(res_all, cfg)
 
 def usual_graph():
-    colors = ['r', 'b', 'g', 'm', 'c', 'y', 'k']
+    colors = ['r', 'b', 'g', 'm', 'c', 'y', 'k', '#ffa000', '#7366bd']
     markers = ['o', '^', 'd', (5,1)]
-    labels = ["Arora", "Random-rare", "Random-uniform", "Clust-words", "SVD", "Clust-tfIdf"]
-    result_dir = 'test/024_04_16_diag_70_/'
+    #labels = ["Arora", "Random-rare", "Random-uniform", "Clust-words", "SVD", "Clust-tfIdf"]
+    labels = ["","Arora","Random-rare", "Random-uniform", "Clust-words", "SVD","Clust-tfidf", "Mixed-clust", "Mixed-Arora","Arora uniform"]
+    result_dir = 'test/024_04_16_random_uniform70_/'
     cfg = config.load(result_dir+'plsa_config.txt')
     cfg['result_dir'] = result_dir
     results = []
@@ -371,12 +372,12 @@ def usual_graph():
             index_exp_series = 0
             for it, expirement_runs in enumerate([int(x) for x in cfg['runs'].split(",")]):
                 series_stats = calculate_stats(val[index_exp_series:index_exp_series+expirement_runs, 0:], cfg['begin_graph_iter'])
-                plt.plot(range(cfg['begin_graph_iter'], cfg['begin_graph_iter'] + len(series_stats[0])), series_stats[0], linewidth=2, c=colors[it % len(colors)], label = labels[it])
+                plt.plot(range(cfg['begin_graph_iter'], cfg['begin_graph_iter'] + len(series_stats[0])), series_stats[0], linewidth=2, c=colors[it % len(colors)], label = labels[int(cfg['prepare_method'].split(',')[it])])
                 plt.fill_between(range(cfg['begin_graph_iter'], cfg['begin_graph_iter'] + len(series_stats[0])), series_stats[2], series_stats[3], alpha = 0.1, facecolor=colors[it % len(colors)])
                 index_exp_series += expirement_runs
 
             x1,x2,y1,y2 = plt.axis()
-            plt.axis((x1,x2,0,3))
+            plt.axis((x1,x2,1900,2100))
             plt.legend()
             plt.draw()
 
@@ -387,7 +388,7 @@ def usual_graph():
             plt.title("F", fontsize=18)
             plt.xlabel("Iteration", fontsize=18)
             x1,x2,y1,y2 = plt.axis()
-            plt.axis((x1,x2,0,3))
+            plt.axis((x1,x2,1900,2100))
             plt.legend()
             plt.draw()
 

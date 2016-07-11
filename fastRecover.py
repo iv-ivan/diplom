@@ -8,7 +8,7 @@ def do_recovery(Q, anchors, loss, params):
     if loss == "originalRecover":
         return (Recover(Q, anchors), None)
     elif loss == "KL" or "L2" in loss:
-        A, colsums = nonNegativeRecover(Q, anchors, params['log_prefix'], loss, params['max_threads'], epsilon=params['eps'])
+        A, colsums = nonNegativeRecover(Q, anchors, params['log_prefix'], loss, params['max_threads'], initial_stepsize=8)#, epsilon=params['eps'])
         hp = colsums
         
         return A, hp
@@ -120,7 +120,7 @@ def fastQuadSolveExpGrad(y, x, eps, initialStepsize, recoveryLog, anchorsTimesAn
     return alpha, iteration, new_obj, None, gap
 
 def quadSolveExpGrad(y, x, eps, alpha=None, XX=None): 
-    c1 = 10**(-4)
+    c1 = 10**(-4)#-4
     c2 = 0.75
     if XX == None:
         print 'making XXT'

@@ -1,26 +1,26 @@
 # common params
 
-eps = 1e-7
-max_iter = 100
-seed = 444
+eps = 10e-7 ####10e-7
+max_iter = 50
+seed = 898#444
 num_threads = -1
 
 # kmeans params
 
-num_clusters = 80#150
+num_clusters = 70#150
 kmeans_max_iter = 50
 
 # anchor params
 
-max_threads = 0
-new_dim = 1000
+max_threads = 8###0
+new_dim = 1500 #must change for real collections!!!!
 
 # data params
 
 data_dir = datasets
-load_data = 1 #uci # 1, uci - uci format, 2 - random, 3 - halfmodel, 4 - diagonal with T
-data_name = kos
-alpha = 0.8
+load_data = 4 #uci # 1, uci - uci format, 2 - random, 3 - halfmodel, 4 - diagonal with T
+data_name = nips
+alpha = 1.0
 gen_name = 0_1_100_16_500
 
 # methods params
@@ -29,26 +29,21 @@ gen_name = 0_1_100_16_500
 grad_desc_alpha = 1
 grad_desc_alpha_step = 0.8
 
-# for cnmf
-cnmf_alpha = 0.1
-cnmf_beta = 0.21
-
 # matrix parameters
 
-#gen_phi = gen_matrix_topic
 gen_phi = gen_matrix_sparse
 gen_theta = gen_matrix_sparse
 gen_documents = 1
-real_phi_sparsity = 0.05
-real_theta_sparsity = 0.1
-phi_sparsity = 0.5####0.05
-theta_sparsity = 0.6####0.1
+real_phi_sparsity = 0.5#0.5
+real_theta_sparsity = 0.1 #0.6
+phi_sparsity = 0.05
+theta_sparsity = 0.1
 
 phi_init = gen_matrix_sparse
 theta_init = gen_matrix_sparse
 
-N = 2000 # number of words
-M = 500 # number of documents
+N = 10 # number of words
+M = 10 # number of documents
 T_0 = 70 # "real" number of topics
 T = 70 # number of topics
 
@@ -60,31 +55,26 @@ nkernel = 25
 
 # experiments params
 
-#experiment = nips_30_T25_conv_p10
 experiment = plsa
-#experiment = test_time
 prepare = 0 # -1 --- no preparation
-prepare_method = 1, 2, 3, 4, 5, 6 #array connected to runs
+prepare_method = 1,9#1,3,4,7,8#array connected to runs
 compare_prepare = 0
 compare_methods = 0
-T_begin = 5
-T_end = 100
-T_step = 5
+#T_begin = 5
+#T_end = 100
+#T_step = 5
 run_info = 1 # none(0), results(1), run(2)
-runs = 3,3,3,3,1,3#10, 10, 10, 10, 1, 10# times to run the experiments
+runs = 10,10#10,10,10,10,10#times to run the experiments
 schedule = plsa #als,hals,mult,plsa # schedule of methods (no spaces); all methods in methods.py
-measure = frobenius,perplexity,hellinger # measures to produce; all methods in measure.py
+measure = perplexity,hellinger # measures to produce; all methods in measure.py
 finals = mean_pmi,mean_nhell#mean_max_pmi,mean_hell,mean_nhell,min_nhell
 compare_real = 0 # compare with real matrices 0, 1
 munkres = 1
-normalize_iter = 1 # iteration on what to apply normalization
 save_results = 0
 save_file = results.txt
-save_matrices = 0, 0, 0, 0, 0, 0 #array for every prepare_method
+save_matrices = 0, 0, 0, 0, 0, 0, 0, 0 #array for every prepare_method
 show_results = 0
 save_topics = 0
-result_dir = test/024_04_16_testtest/
-save_results = 0
-prepare = 0
-
+result_dir = test/diag_arora_uniform/
+jogging = 1
 begin_graph_iter = 0
